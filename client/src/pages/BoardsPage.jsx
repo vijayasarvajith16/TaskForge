@@ -137,13 +137,13 @@ export default function BoardsPage() {
         <Tab.Container defaultActiveKey="boards">
           <Nav variant="tabs" className="mb-4 border-secondary">
             <Nav.Item>
-              <Nav.Link eventKey="boards" className="text-light">
+              <Nav.Link eventKey="boards">
                 <LayoutDashboard size={15} className="me-1" /> Boards
               </Nav.Link>
             </Nav.Item>
             {canManage && (
               <Nav.Item>
-                <Nav.Link eventKey="templates" className="text-light">
+                <Nav.Link eventKey="templates">
                   <FileText size={15} className="me-1" /> Templates
                 </Nav.Link>
               </Nav.Item>

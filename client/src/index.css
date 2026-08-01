@@ -42,11 +42,10 @@ body {
 
 /* ─── Page & Layout Adjustments ───────────────────────────── */
 .min-vh-100 {
-  background: transparent !important; /* Let body background show through */
+  background: transparent !important;
 }
 
 /* ─── Trello List (Column) Customization ──────────────────── */
-/* Matches the column design to Trello's iconic lists */
 div[style*="rgba(30, 30, 46, 0.7)"],
 div[class*="rounded-3"] {
   background-color: var(--list-bg) !important;
@@ -87,7 +86,6 @@ div[class*="rounded-3"] {
   overflow: hidden;
 }
 
-/* Pulsing highlight on hover, shrink on click */
 .btn:hover {
   transform: translateY(-1px);
   filter: brightness(1.1);
@@ -99,7 +97,6 @@ div[class*="rounded-3"] {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-/* Custom reactive effect for control buttons inside task cards */
 button.p-0 {
   transition: all 0.2s ease !important;
 }
@@ -211,4 +208,41 @@ button:hover .lucide-bell,
 
 .task-card {
   animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Nav Tab Styling Override ────────────────────────────── */
+/* Fixes white-on-white text for active Boards and Templates tabs */
+.nav-tabs {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.nav-tabs .nav-link {
+  border: 1px solid transparent !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  background-color: transparent !important;
+  border-radius: 6px 6px 0 0 !important;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.nav-tabs .nav-link:hover {
+  color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.08) rgba(255, 255, 255, 0.08) transparent !important;
+}
+
+/* Force dark-mode tab styles to prevent Bootstrap white-on-white defaults */
+.nav-tabs .nav-link.active,
+.nav-tabs .nav-link.text-light.active {
+  color: #38bdf8 !important; /* Premium sky blue text for active */
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.12) rgba(255, 255, 255, 0.12) transparent !important;
+}
+
+/* ─── Select & Option Overrides ─────────────────────────────── */
+/* Prevents system browser defaults from rendering white bg with white text */
+select.form-select option,
+select option {
+  background-color: #161a22 !important;
+  color: #f8f9fa !important;
 }
