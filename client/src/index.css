@@ -1,60 +1,214 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 
-/* ─── Global Overrides ────────────────────────────── */
+/* ─── Trello Aesthetic Variables & Global Overrides ────────────────────────── */
+:root {
+  --trello-blue: #0079bf;
+  --trello-dark-blue: #092c4c;
+  --board-bg: linear-gradient(135deg, #0f172a 0%, #1e1b4b 40%, #0369a1 100%);
+  --list-bg: #101214;
+  --card-bg: #22252a;
+  --card-hover-bg: #2c3038;
+  --card-border: 1px solid rgba(255, 255, 255, 0.06);
+  --shadow-sm: 0 1px 1px rgba(0, 0, 0, 0.2), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #0f0f1a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--board-bg) !important;
+  background-attachment: fixed !important;
   color: #e2e8f0;
   margin: 0;
+  overflow-x: hidden;
 }
 
-/* Scrollbar */
+/* ─── Scrollbar Customization ────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+  transition: background 0.25s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
-/* Card hover */
+/* ─── Page & Layout Adjustments ───────────────────────────── */
+.min-vh-100 {
+  background: transparent !important; /* Let body background show through */
+}
+
+/* ─── Trello List (Column) Customization ──────────────────── */
+/* Matches the column design to Trello's iconic lists */
+div[style*="rgba(30, 30, 46, 0.7)"],
+div[class*="rounded-3"] {
+  background-color: var(--list-bg) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.25) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ─── Trello Card Customization ───────────────────────────── */
+.task-card {
+  background-color: var(--card-bg) !important;
+  border: var(--card-border) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--shadow-sm) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  margin-bottom: 8px !important;
+}
+
 .task-card:hover {
+  transform: translateY(-2px) scale(1.01);
+  background-color: var(--card-hover-bg) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35) !important;
+}
+
+.task-card:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-sm) !important;
+}
+
+/* ─── Reactive & Animated Buttons ─────────────────────────── */
+.btn {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Pulsing highlight on hover, shrink on click */
+.btn:hover {
   transform: translateY(-1px);
-  border-color: rgba(99, 102, 241, 0.4) !important;
+  filter: brightness(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
 }
 
-/* Dropdown dark overrides */
-.dropdown-menu {
-  --bs-dropdown-bg: #1e1e2e;
-  --bs-dropdown-link-hover-bg: rgba(99, 102, 241, 0.15);
-}
-.dropdown-item:hover {
-  color: #c4b5fd !important;
+.btn:active {
+  transform: translateY(1px) scale(0.96);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-/* Modal dark */
+/* Custom reactive effect for control buttons inside task cards */
+button.p-0 {
+  transition: all 0.2s ease !important;
+}
+button.p-0:hover {
+  transform: scale(1.22);
+}
+button.p-0:active {
+  transform: scale(0.9);
+}
+
+/* ─── Checkbox Completion Animation ───────────────────────── */
+@keyframes checkPop {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+button.text-success svg {
+  animation: none;
+}
+button.text-success:hover svg {
+  animation: checkPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* ─── Bell Ringing Animation ──────────────────────────────── */
+@keyframes ring {
+  0% { transform: rotate(0); }
+  10% { transform: rotate(15deg); }
+  20% { transform: rotate(-15deg); }
+  30% { transform: rotate(10deg); }
+  40% { transform: rotate(-10deg); }
+  50% { transform: rotate(5deg); }
+  60% { transform: rotate(-5deg); }
+  100% { transform: rotate(0); }
+}
+
+.nav-link:hover .lucide-bell,
+button:hover .lucide-bell,
+.navbar-brand:hover {
+  animation: ring 0.8s ease-in-out;
+}
+
+/* ─── Modal & Dropdown Overrides ──────────────────────────── */
 .modal-content {
-  background-color: #1e1e2e !important;
+  background-color: #161a22 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-md) !important;
+  animation: modalSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Form focus states */
-.form-control:focus,
-.form-select:focus {
-  border-color: #6366f1 !important;
-  box-shadow: 0 0 0 0.15rem rgba(99, 102, 241, 0.25) !important;
+.dropdown-menu {
+  --bs-dropdown-bg: #161a22;
+  --bs-dropdown-border-color: rgba(255, 255, 255, 0.08);
+  border-radius: 8px !important;
+  box-shadow: var(--shadow-md) !important;
+  animation: dropdownFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Badge refinements */
-.badge {
-  font-weight: 500;
-  letter-spacing: 0.02em;
+@keyframes modalSlideUp {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
-/* Link highlight */
-a.text-primary:hover {
-  color: #818cf8 !important;
+@keyframes dropdownFadeIn {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: #fff !important;
+}
+
+/* ─── Custom Styles & Glassmorphic touches ─────────────────── */
+.navbar {
+  background-color: rgba(15, 23, 42, 0.75) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background-color: rgba(22, 26, 34, 0.8);
+}
+
+.table-dark {
+  --bs-table-bg: transparent !important;
+}
+
+/* Progress bars */
+.progress {
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.progress-bar {
+  border-radius: 8px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Fade in for newly created items */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.task-card {
+  animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
