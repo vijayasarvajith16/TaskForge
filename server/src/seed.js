@@ -12,6 +12,7 @@ async function seed() {
   await db.collection('workspaces').deleteMany({});
   await db.collection('boards').deleteMany({});
   await db.collection('tasks').deleteMany({});
+  await db.collection('eventTemplates').deleteMany({});
 
   console.log('Cleared existing data.');
 
@@ -171,6 +172,27 @@ async function seed() {
   ];
 
   await db.collection('tasks').insertMany(tasks);
+
+  // ─── Demo Template: Freshers Induction ─────────────
+  const bp1 = new ObjectId().toString();
+  const bp2 = new ObjectId().toString();
+  const bp3 = new ObjectId().toString();
+  const bp4 = new ObjectId().toString();
+  const bp5 = new ObjectId().toString();
+
+  await db.collection('eventTemplates').insertOne({
+    workspaceId: wsId,
+    name: 'Freshers Induction',
+    taskBlueprint: [
+      { blueprintId: bp1, title: 'Book auditorium', role: 'head', offsetDaysFromEvent: -14, dependsOn: [] },
+      { blueprintId: bp2, title: 'Send invitations to freshers', role: 'member', offsetDaysFromEvent: -7, dependsOn: [bp1] },
+      { blueprintId: bp3, title: 'Prepare welcome kits', role: 'joint_head', offsetDaysFromEvent: -7, dependsOn: [] },
+      { blueprintId: bp4, title: 'Rehearse event flow', role: 'head', offsetDaysFromEvent: -3, dependsOn: [bp1, bp3] },
+      { blueprintId: bp5, title: 'Set up venue', role: 'member', offsetDaysFromEvent: -1, dependsOn: [bp4] },
+    ],
+    createdAt: now,
+    updatedAt: now,
+  });
 
   console.log('');
   console.log('✅ Seed complete!');

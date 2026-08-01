@@ -22,6 +22,7 @@ export const joinWorkspace = (code) => api.post(`/workspaces/join/${code}`);
 // ─── Boards ────────────────────────────────────────
 export const getBoards = (workspaceId) => api.get('/boards', { params: { workspaceId } });
 export const createBoard = (data) => api.post('/boards', data);
+export const createBoardFromTemplate = (data) => api.post('/boards/from-template', data);
 export const deleteBoard = (id) => api.delete(`/boards/${id}`);
 
 // ─── Tasks ─────────────────────────────────────────
@@ -31,5 +32,11 @@ export const updateTask = (id, data) => api.patch(`/tasks/${id}`, data);
 export const moveTask = (id, data) => api.patch(`/tasks/${id}/move`, data);
 export const completeTask = (id) => api.patch(`/tasks/${id}/complete`);
 export const deleteTask = (id) => api.delete(`/tasks/${id}`);
+
+// ─── Templates ─────────────────────────────────────
+export const getTemplates = (workspaceId) => api.get('/templates', { params: { workspaceId } });
+export const createTemplate = (data) => api.post('/templates', data);
+export const updateTemplate = (id, data) => api.patch(`/templates/${id}`, data);
+export const deleteTemplate = (id) => api.delete(`/templates/${id}`);
 
 export default api;

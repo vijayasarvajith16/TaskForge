@@ -10,6 +10,7 @@ const authRoutes = require('./routes/auth');
 const workspaceRoutes = require('./routes/workspaces');
 const boardRoutes = require('./routes/boards');
 const taskRoutes = require('./routes/tasks');
+const templateRoutes = require('./routes/templates');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/workspaces', workspaceRoutes);
 app.use('/api/boards', boardRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/templates', templateRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
