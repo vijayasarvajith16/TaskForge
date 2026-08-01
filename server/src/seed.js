@@ -13,6 +13,7 @@ async function seed() {
   await db.collection('boards').deleteMany({});
   await db.collection('tasks').deleteMany({});
   await db.collection('eventTemplates').deleteMany({});
+  await db.collection('notifications').deleteMany({});
 
   console.log('Cleared existing data.');
 

@@ -6,6 +6,7 @@ import { BoardProvider, useBoard } from '../context/BoardContext';
 import Column from './Column';
 import TaskForm from './TaskForm';
 import DependencyGraph from './DependencyGraph';
+import NotificationBell from './NotificationBell';
 import { Button, Spinner, Alert, ButtonGroup } from 'react-bootstrap';
 import { ArrowLeft, Plus, LayoutGrid, GitBranch } from 'lucide-react';
 
@@ -103,6 +104,7 @@ function BoardInner() {
           </span>
         </div>
         <div className="d-flex align-items-center gap-2">
+          <NotificationBell token={localStorage.getItem('token')} />
           {/* View toggle */}
           <ButtonGroup size="sm">
             <Button

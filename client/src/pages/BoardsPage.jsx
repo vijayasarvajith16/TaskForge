@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { getBoards, createBoard, deleteBoard, getTemplates, createTemplate, updateTemplate, deleteTemplate, createBoardFromTemplate } from '../api';
 import TemplateEditor from '../components/TemplateEditor';
 import CreateFromTemplate from '../components/CreateFromTemplate';
+import NotificationBell from '../components/NotificationBell';
 import {
   Container, Card, Row, Col, Button, Form, Alert, Badge, Spinner, Tab, Nav,
 } from 'react-bootstrap';
@@ -118,6 +119,7 @@ export default function BoardsPage() {
           <Button variant="outline-light" size="sm" onClick={() => navigate('/workspace')}>
             <Users size={14} className="me-1" /> Workspace
           </Button>
+          <NotificationBell token={localStorage.getItem('token')} />
           <Badge bg="secondary" className="text-capitalize">{user?.role?.replace('_', ' ')}</Badge>
           <span className="text-secondary small">{user?.name}</span>
           <Button variant="outline-danger" size="sm" onClick={logout}>

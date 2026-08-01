@@ -39,4 +39,12 @@ export const createTemplate = (data) => api.post('/templates', data);
 export const updateTemplate = (id, data) => api.patch(`/templates/${id}`, data);
 export const deleteTemplate = (id) => api.delete(`/templates/${id}`);
 
+// ─── Notifications ─────────────────────────────────
+export const getNotifications = () => api.get('/notifications');
+export const markNotificationRead = (id) => api.patch(`/notifications/${id}/read`);
+export const markAllNotificationsRead = () => api.patch('/notifications/read-all');
+
+// ─── Escalation (testing) ──────────────────────────
+export const triggerEscalation = () => api.post('/escalation/run');
+
 export default api;

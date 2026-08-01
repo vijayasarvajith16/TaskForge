@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 const { findByBoard, findTaskById, updateTask } = require('../models/tasks');
 
+// In-memory map: userId (string) -> Set<socketId>
+const userSocketMap = new Map();
+
 function initSockets(io) {
   // Authenticate socket connections via JWT
   io.use((socket, next) => {
@@ -16,25 +19,25 @@ function initSockets(io) {
   });
 
   io.on('connection', (socket) => {
-    console.log(`Socket connected: ${socket.id} (user: ${socket.userId})`);
+    const userId = socket.userId;
+    console.log(`Socket connected: ${socket.id} (user: ${userId})`);
+
+    // Track userId -> socketId mapping
+    if (!userSocketMap.has(userId)) {
+      userSocketMap.set(userId, new Set());
+    }
+    userSocketMap.get(userId).add(socket.id);
 
     // ── join_board ─────────────────────────────────
     socket.on('join_board', ({ boardId }) => {
-      // Leave any previous board rooms (except the socket's own room)
-      for (const room of socket.rooms) {
-        if (room !== socket.id) socket.leave(room);
-      }
       socket.join(boardId);
       console.log(`Socket ${socket.id} joined board room: ${boardId}`);
     });
 
     // ── task_moved ─────────────────────────────────
-    // Client sends this after a drag-drop. We persist via model,
-    // then broadcast to everyone else in the room.
     socket.on('task_moved', async ({ taskId, columnId, order, boardId }) => {
       try {
         const updated = await updateTask(taskId, { columnId, order });
-        // Broadcast to all OTHER clients in the board room
         socket.to(boardId).emit('task_moved', {
           taskId,
           columnId: updated.columnId.toString(),
@@ -48,7 +51,6 @@ function initSockets(io) {
 
     // ── task_updated ───────────────────────────────
     socket.on('task_updated', async ({ task, boardId }) => {
-      // Broadcast the full updated task to everyone else
       socket.to(boardId).emit('task_updated', { task });
     });
 
@@ -64,8 +66,14 @@ function initSockets(io) {
 
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`);
+      // Clean up userId -> socketId mapping
+      const sockets = userSocketMap.get(userId);
+      if (sockets) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) userSocketMap.delete(userId);
+      }
     });
   });
 }
 
-module.exports = { initSockets };
+module.exports = { initSockets, userSocketMap };
