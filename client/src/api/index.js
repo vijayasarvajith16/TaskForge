@@ -29,6 +29,7 @@ export const getTasks = (boardId) => api.get('/tasks', { params: { boardId } });
 export const createTask = (data) => api.post('/tasks', data);
 export const updateTask = (id, data) => api.patch(`/tasks/${id}`, data);
 export const moveTask = (id, data) => api.patch(`/tasks/${id}/move`, data);
+export const completeTask = (id) => api.patch(`/tasks/${id}/complete`);
 export const deleteTask = (id) => api.delete(`/tasks/${id}`);
 
 export default api;

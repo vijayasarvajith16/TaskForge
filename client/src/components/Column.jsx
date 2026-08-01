@@ -10,7 +10,7 @@ const columnColors = {
   'Done': '#10b981',
 };
 
-export default function Column({ column, tasks, members, onAddTask, onEditTask, onDeleteTask, canEdit }) {
+export default function Column({ column, tasks, members, allTasks = [], onAddTask, onEditTask, onDeleteTask, onCompleteTask, canEdit }) {
   const accentColor = columnColors[column.name] || '#6366f1';
   const droppableId = column._id.toString();
 
@@ -55,7 +55,7 @@ export default function Column({ column, tasks, members, onAddTask, onEditTask, 
         )}
       </div>
 
-      {/* Droppable task area — no overflow on this div to avoid nested scroll warning */}
+      {/* Droppable task area */}
       <Droppable droppableId={droppableId}>
         {(provided, snapshot) => (
           <div
@@ -71,34 +71,41 @@ export default function Column({ column, tasks, members, onAddTask, onEditTask, 
                 : 'transparent',
             }}
           >
-            {tasks.map((task, index) => (
-              <Draggable
-                key={task._id.toString()}
-                draggableId={task._id.toString()}
-                index={index}
-              >
-                {(dragProvided, dragSnapshot) => (
-                  <div
-                    ref={dragProvided.innerRef}
-                    {...dragProvided.draggableProps}
-                    {...dragProvided.dragHandleProps}
-                    style={{
-                      ...dragProvided.draggableProps.style,
-                      opacity: dragSnapshot.isDragging ? 0.85 : 1,
-                    }}
-                  >
-                    <TaskCard
-                      task={task}
-                      members={members}
-                      onEdit={onEditTask}
-                      onDelete={onDeleteTask}
-                      canEdit={canEdit}
-                      isDragging={dragSnapshot.isDragging}
-                    />
-                  </div>
-                )}
-              </Draggable>
-            ))}
+            {tasks.map((task, index) => {
+              const isLocked = task.status === 'locked';
+
+              return (
+                <Draggable
+                  key={task._id.toString()}
+                  draggableId={task._id.toString()}
+                  index={index}
+                  isDragDisabled={isLocked}
+                >
+                  {(dragProvided, dragSnapshot) => (
+                    <div
+                      ref={dragProvided.innerRef}
+                      {...dragProvided.draggableProps}
+                      {...dragProvided.dragHandleProps}
+                      style={{
+                        ...dragProvided.draggableProps.style,
+                        opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                      }}
+                    >
+                      <TaskCard
+                        task={task}
+                        members={members}
+                        allTasks={allTasks}
+                        onEdit={onEditTask}
+                        onDelete={onDeleteTask}
+                        onComplete={onCompleteTask}
+                        canEdit={canEdit}
+                        isDragging={dragSnapshot.isDragging}
+                      />
+                    </div>
+                  )}
+                </Draggable>
+              );
+            })}
             {provided.placeholder}
             {tasks.length === 0 && !snapshot.isDraggingOver && (
               <p className="text-secondary text-center small mt-3" style={{ opacity: 0.5 }}>

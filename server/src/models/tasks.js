@@ -5,7 +5,7 @@ function col() {
   return getDb().collection('tasks');
 }
 
-async function createTask({ boardId, columnId, title, description = '', assignedTo = null, dueDate = null }) {
+async function createTask({ boardId, columnId, title, description = '', assignedTo = null, dueDate = null, dependsOn = [] }) {
   // Set order to the count of tasks already in that column
   const count = await col().countDocuments({ boardId: new ObjectId(boardId), columnId: new ObjectId(columnId) });
 
@@ -18,7 +18,7 @@ async function createTask({ boardId, columnId, title, description = '', assigned
     description,
     assignedTo: assignedTo ? new ObjectId(assignedTo) : null,
     dueDate: dueDate ? new Date(dueDate) : null,
-    dependsOn: [],
+    dependsOn: Array.isArray(dependsOn) ? dependsOn.map((id) => new ObjectId(id)) : [],
     status: 'open',
     escalationLevel: 0,
     createdAt: now,
@@ -42,9 +42,28 @@ async function updateTask(id, updates) {
   if (updates.assignedTo) updates.assignedTo = new ObjectId(updates.assignedTo);
   if (updates.columnId) updates.columnId = new ObjectId(updates.columnId);
   if (updates.dueDate) updates.dueDate = new Date(updates.dueDate);
+  if (Array.isArray(updates.dependsOn)) {
+    updates.dependsOn = updates.dependsOn.map((id) => new ObjectId(id));
+  }
 
   await col().updateOne({ _id: new ObjectId(id) }, { $set: updates });
   return findTaskById(id);
+}
+
+/**
+ * Bulk-update the status field for multiple tasks at once.
+ * Returns the list of modified task IDs.
+ */
+async function bulkUpdateStatus(taskStatusPairs) {
+  const ops = taskStatusPairs.map(({ taskId, status }) => ({
+    updateOne: {
+      filter: { _id: new ObjectId(taskId) },
+      update: { $set: { status, updatedAt: new Date() } },
+    },
+  }));
+  if (ops.length > 0) {
+    await col().bulkWrite(ops);
+  }
 }
 
 async function deleteTask(id) {
@@ -55,4 +74,4 @@ async function deleteByBoard(boardId) {
   await col().deleteMany({ boardId: new ObjectId(boardId) });
 }
 
-module.exports = { createTask, findByBoard, findTaskById, updateTask, deleteTask, deleteByBoard };
+module.exports = { createTask, findByBoard, findTaskById, updateTask, bulkUpdateStatus, deleteTask, deleteByBoard };

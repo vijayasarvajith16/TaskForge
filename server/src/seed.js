@@ -1,5 +1,6 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
+const { ObjectId } = require('mongodb');
 const { connectDb, getDb, closeDb } = require('./db');
 
 async function seed() {
@@ -65,7 +66,6 @@ async function seed() {
   );
 
   // ─── Board ───────────────────────────────────────
-  const { ObjectId } = require('mongodb');
   const col1 = new ObjectId();
   const col2 = new ObjectId();
   const col3 = new ObjectId();
@@ -85,23 +85,51 @@ async function seed() {
   });
   const boardId = boardResult.insertedId;
 
-  // ─── Tasks ───────────────────────────────────────
+  // ─── Tasks (with dependency chain) ────────────────
   const now = new Date();
   const inFive = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
   const inTen = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000);
+  const inFifteen = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
   const yesterday = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
 
+  // Pre-generate task IDs for cross-referencing dependencies
+  const taskAId = new ObjectId();
+  const taskBId = new ObjectId();
+  const taskCId = new ObjectId();
+
   const tasks = [
+    // ── Dependency chain: A → B → C ──
     {
+      _id: taskAId,
       boardId, columnId: col1, order: 0,
-      title: 'Draft recruitment poster',
-      description: 'Design an eye-catching poster for the recruitment campaign',
+      title: 'Design recruitment poster',
+      description: 'Create the visual design for the poster — this is the first step in the chain',
       assignedTo: memberId, dueDate: inFive,
       dependsOn: [], status: 'open', escalationLevel: 0,
       createdAt: now, updatedAt: now,
     },
     {
+      _id: taskBId,
       boardId, columnId: col1, order: 1,
+      title: 'Print recruitment posters',
+      description: 'Send the approved design to the print shop (depends on poster design)',
+      assignedTo: jhId, dueDate: inTen,
+      dependsOn: [taskAId], status: 'locked', escalationLevel: 0,
+      createdAt: now, updatedAt: now,
+    },
+    {
+      _id: taskCId,
+      boardId, columnId: col1, order: 2,
+      title: 'Distribute posters on campus',
+      description: 'Pin up posters on all notice boards (depends on printing)',
+      assignedTo: memberId, dueDate: inFifteen,
+      dependsOn: [taskBId], status: 'locked', escalationLevel: 0,
+      createdAt: now, updatedAt: now,
+    },
+
+    // ── Independent tasks ──
+    {
+      boardId, columnId: col1, order: 3,
       title: 'Book interview rooms',
       description: 'Reserve seminar halls A & B for interview week',
       assignedTo: jhId, dueDate: inTen,
@@ -133,7 +161,7 @@ async function seed() {
       createdAt: now, updatedAt: now,
     },
     {
-      boardId, columnId: col1, order: 2,
+      boardId, columnId: col1, order: 4,
       title: 'Assign panel interviewers',
       description: 'Map team members to interview slots',
       assignedTo: headId, dueDate: inTen,
@@ -155,6 +183,10 @@ async function seed() {
   console.log('Workspace: HR Team Alpha');
   console.log('Invite code: DEMO2026');
   console.log(`Board: Recruitment Drive - August (${tasks.length} tasks)`);
+  console.log('');
+  console.log('Dependency chain: Design poster → Print posters → Distribute posters');
+  console.log('  "Print posters" is LOCKED (depends on "Design poster")');
+  console.log('  "Distribute posters" is LOCKED (depends on "Print posters")');
   console.log('');
 
   await closeDb();

@@ -5,8 +5,9 @@ import { useAuth } from '../context/AuthContext';
 import { BoardProvider, useBoard } from '../context/BoardContext';
 import Column from './Column';
 import TaskForm from './TaskForm';
-import { Button, Spinner, Alert } from 'react-bootstrap';
-import { ArrowLeft, Plus } from 'lucide-react';
+import DependencyGraph from './DependencyGraph';
+import { Button, Spinner, Alert, ButtonGroup } from 'react-bootstrap';
+import { ArrowLeft, Plus, LayoutGrid, GitBranch } from 'lucide-react';
 
 function BoardInner() {
   const { boardId } = useParams();
@@ -14,8 +15,11 @@ function BoardInner() {
   const navigate = useNavigate();
   const {
     board, tasks, loading, error, setError,
-    loadData, moveTask, createTask, updateTask, deleteTask,
+    loadData, moveTask, createTask, updateTask, completeTask, deleteTask,
   } = useBoard();
+
+  // View mode: 'kanban' or 'graph'
+  const [viewMode, setViewMode] = useState('kanban');
 
   // Task form state
   const [showForm, setShowForm] = useState(false);
@@ -36,16 +40,16 @@ function BoardInner() {
   const handleDragEnd = (result) => {
     const { draggableId, destination, source } = result;
 
-    // Dropped outside any droppable
     if (!destination) return;
-
-    // Dropped in the same position
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
     ) return;
 
-    // Call the optimistic move in BoardContext
+    // Don't allow dragging locked tasks (also enforced in Column via isDragDisabled)
+    const draggedTask = tasks.find((t) => t._id.toString() === draggableId);
+    if (draggedTask?.status === 'locked') return;
+
     moveTask(draggableId, destination.droppableId, destination.index);
   };
 
@@ -98,11 +102,31 @@ function BoardInner() {
             ● Live
           </span>
         </div>
-        {canEdit && (
-          <Button variant="primary" size="sm" onClick={() => handleAddTask(board?.columns?.[0]?._id?.toString())}>
-            <Plus size={14} className="me-1" /> New Task
-          </Button>
-        )}
+        <div className="d-flex align-items-center gap-2">
+          {/* View toggle */}
+          <ButtonGroup size="sm">
+            <Button
+              variant={viewMode === 'kanban' ? 'primary' : 'outline-secondary'}
+              onClick={() => setViewMode('kanban')}
+              title="Kanban View"
+            >
+              <LayoutGrid size={14} className="me-1" /> Kanban
+            </Button>
+            <Button
+              variant={viewMode === 'graph' ? 'primary' : 'outline-secondary'}
+              onClick={() => setViewMode('graph')}
+              title="Dependency Graph"
+            >
+              <GitBranch size={14} className="me-1" /> Graph
+            </Button>
+          </ButtonGroup>
+
+          {canEdit && (
+            <Button variant="primary" size="sm" onClick={() => handleAddTask(board?.columns?.[0]?._id?.toString())}>
+              <Plus size={14} className="me-1" /> New Task
+            </Button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -111,32 +135,43 @@ function BoardInner() {
         </Alert>
       )}
 
-      {/* Drag-and-drop board */}
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <div
-          className="d-flex gap-3 p-3"
-          style={{ overflowX: 'auto', minHeight: 'calc(100vh - 60px)' }}
-        >
-          {sortedColumns.map((col) => {
-            const colTasks = tasks
-              .filter((t) => t.columnId.toString() === col._id.toString())
-              .sort((a, b) => a.order - b.order);
+      {/* Kanban View */}
+      {viewMode === 'kanban' && (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div
+            className="d-flex gap-3 p-3"
+            style={{ overflowX: 'auto', minHeight: 'calc(100vh - 60px)' }}
+          >
+            {sortedColumns.map((col) => {
+              const colTasks = tasks
+                .filter((t) => t.columnId.toString() === col._id.toString())
+                .sort((a, b) => a.order - b.order);
 
-            return (
-              <Column
-                key={col._id.toString()}
-                column={col}
-                tasks={colTasks}
-                members={members}
-                onAddTask={() => handleAddTask(col._id.toString())}
-                onEditTask={handleEditTask}
-                onDeleteTask={deleteTask}
-                canEdit={canEdit}
-              />
-            );
-          })}
+              return (
+                <Column
+                  key={col._id.toString()}
+                  column={col}
+                  tasks={colTasks}
+                  members={members}
+                  allTasks={tasks}
+                  onAddTask={() => handleAddTask(col._id.toString())}
+                  onEditTask={handleEditTask}
+                  onDeleteTask={deleteTask}
+                  onCompleteTask={completeTask}
+                  canEdit={canEdit}
+                />
+              );
+            })}
+          </div>
+        </DragDropContext>
+      )}
+
+      {/* Dependency Graph View */}
+      {viewMode === 'graph' && (
+        <div className="p-3">
+          <DependencyGraph tasks={tasks} />
         </div>
-      </DragDropContext>
+      )}
 
       {/* Task form modal */}
       <TaskForm
@@ -146,6 +181,7 @@ function BoardInner() {
         task={editingTask}
         columns={board?.columns || []}
         members={members}
+        allTasks={tasks}
       />
     </div>
   );
