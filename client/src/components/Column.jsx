@@ -1,6 +1,7 @@
+import { Droppable, Draggable } from '@hello-pangea/dnd';
 import TaskCard from './TaskCard';
-import { Button, Dropdown } from 'react-bootstrap';
-import { Plus, ArrowRight } from 'lucide-react';
+import { Button } from 'react-bootstrap';
+import { Plus } from 'lucide-react';
 
 const columnColors = {
   'To Do': '#6366f1',
@@ -9,8 +10,9 @@ const columnColors = {
   'Done': '#10b981',
 };
 
-export default function Column({ column, tasks, members, allColumns, onAddTask, onEditTask, onDeleteTask, onMoveTask, canEdit }) {
+export default function Column({ column, tasks, members, onAddTask, onEditTask, onDeleteTask, canEdit }) {
   const accentColor = columnColors[column.name] || '#6366f1';
+  const droppableId = column._id.toString();
 
   return (
     <div
@@ -21,12 +23,14 @@ export default function Column({ column, tasks, members, allColumns, onAddTask, 
         flex: '1 1 280px',
         backgroundColor: 'rgba(30,30,46,0.7)',
         border: '1px solid rgba(255,255,255,0.08)',
+        maxHeight: 'calc(100vh - 80px)',
+        overflow: 'hidden',
       }}
     >
       {/* Column header */}
       <div
-        className="d-flex justify-content-between align-items-center px-3 py-2 rounded-top-3"
-        style={{ borderBottom: `2px solid ${accentColor}` }}
+        className="d-flex justify-content-between align-items-center px-3 py-2"
+        style={{ borderBottom: `2px solid ${accentColor}`, flexShrink: 0 }}
       >
         <div className="d-flex align-items-center gap-2">
           <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: accentColor }} />
@@ -51,54 +55,59 @@ export default function Column({ column, tasks, members, allColumns, onAddTask, 
         )}
       </div>
 
-      {/* Tasks */}
-      <div className="p-2 flex-grow-1" style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 220px)' }}>
-        {tasks.map((task) => (
-          <div key={task._id.toString()}>
-            <TaskCard
-              task={task}
-              members={members}
-              onEdit={onEditTask}
-              onDelete={onDeleteTask}
-              canEdit={canEdit}
-            />
-            {/* Move dropdown */}
-            {canEdit && (
-              <div className="d-flex justify-content-end mb-2" style={{ marginTop: -6 }}>
-                <Dropdown>
-                  <Dropdown.Toggle
-                    variant="link"
-                    size="sm"
-                    className="p-0 text-secondary"
-                    style={{ fontSize: '0.7rem', textDecoration: 'none' }}
+      {/* Droppable task area — no overflow on this div to avoid nested scroll warning */}
+      <Droppable droppableId={droppableId}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className="p-2 flex-grow-1"
+            style={{
+              minHeight: 80,
+              overflowY: 'auto',
+              transition: 'background-color 0.2s ease',
+              backgroundColor: snapshot.isDraggingOver
+                ? 'rgba(99, 102, 241, 0.08)'
+                : 'transparent',
+            }}
+          >
+            {tasks.map((task, index) => (
+              <Draggable
+                key={task._id.toString()}
+                draggableId={task._id.toString()}
+                index={index}
+              >
+                {(dragProvided, dragSnapshot) => (
+                  <div
+                    ref={dragProvided.innerRef}
+                    {...dragProvided.draggableProps}
+                    {...dragProvided.dragHandleProps}
+                    style={{
+                      ...dragProvided.draggableProps.style,
+                      opacity: dragSnapshot.isDragging ? 0.85 : 1,
+                    }}
                   >
-                    <ArrowRight size={11} className="me-1" />Move
-                  </Dropdown.Toggle>
-                  <Dropdown.Menu className="bg-dark border-secondary">
-                    {allColumns
-                      .filter((c) => c._id.toString() !== column._id.toString())
-                      .map((c) => (
-                        <Dropdown.Item
-                          key={c._id.toString()}
-                          onClick={() => onMoveTask(task._id, c._id.toString())}
-                          className="text-light small"
-                          style={{ fontSize: '0.8rem' }}
-                        >
-                          {c.name}
-                        </Dropdown.Item>
-                      ))}
-                  </Dropdown.Menu>
-                </Dropdown>
-              </div>
+                    <TaskCard
+                      task={task}
+                      members={members}
+                      onEdit={onEditTask}
+                      onDelete={onDeleteTask}
+                      canEdit={canEdit}
+                      isDragging={dragSnapshot.isDragging}
+                    />
+                  </div>
+                )}
+              </Draggable>
+            ))}
+            {provided.placeholder}
+            {tasks.length === 0 && !snapshot.isDraggingOver && (
+              <p className="text-secondary text-center small mt-3" style={{ opacity: 0.5 }}>
+                No tasks
+              </p>
             )}
           </div>
-        ))}
-        {tasks.length === 0 && (
-          <p className="text-secondary text-center small mt-3" style={{ opacity: 0.5 }}>
-            No tasks
-          </p>
         )}
-      </div>
+      </Droppable>
     </div>
   );
 }

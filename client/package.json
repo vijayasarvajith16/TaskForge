@@ -13,11 +13,13 @@
     "vite": "^8.2.0"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@vitejs/plugin-react": "^6.0.5",
     "axios": "^1.19.0",
     "bootstrap": "^5.3.8",
     "lucide-react": "^1.28.0",
     "react-bootstrap": "^2.10.10",
-    "react-router-dom": "^7.18.2"
+    "react-router-dom": "^7.18.2",
+    "socket.io-client": "^4.8.3"
   }
 }

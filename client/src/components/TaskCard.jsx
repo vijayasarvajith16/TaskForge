@@ -1,7 +1,7 @@
 import { Card, Badge, Button, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { Calendar, User, Trash2, Edit2 } from 'lucide-react';
 
-export default function TaskCard({ task, members, onEdit, onDelete, canEdit }) {
+export default function TaskCard({ task, members, onEdit, onDelete, canEdit, isDragging = false }) {
   const assignee = members.find((m) => m._id.toString() === task.assignedTo?.toString());
 
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'done';
@@ -20,7 +20,15 @@ export default function TaskCard({ task, members, onEdit, onDelete, canEdit }) {
   };
 
   return (
-    <Card className="bg-dark border-secondary mb-2 shadow-sm task-card" style={{ transition: 'transform 0.15s' }}>
+    <Card
+      className={`bg-dark border-secondary mb-2 shadow-sm task-card ${isDragging ? 'shadow-lg' : ''}`}
+      style={{
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        borderColor: isDragging ? '#6366f1' : undefined,
+        boxShadow: isDragging ? '0 8px 25px rgba(99, 102, 241, 0.3)' : undefined,
+        cursor: 'grab',
+      }}
+    >
       <Card.Body className="p-3">
         <div className="d-flex justify-content-between align-items-start mb-1">
           <h6 className="mb-0 fw-semibold text-light" style={{ fontSize: '0.9rem' }}>
