@@ -173,19 +173,50 @@ export default function BoardsPage() {
               </div>
 
               {showCreate && (
-                <Card className="bg-dark border-secondary mb-4">
-                  <Card.Body>
-                    <Form onSubmit={handleCreateBoard} className="d-flex gap-2">
-                      <Form.Control
-                        type="text"
-                        value={boardName}
-                        onChange={(e) => setBoardName(e.target.value)}
-                        required
-                        className="bg-dark text-light border-secondary"
-                        placeholder="Board name"
-                      />
-                      <Button type="submit" variant="primary">Create</Button>
-                      <Button variant="outline-secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Card className="bg-dark border-secondary mb-4 shadow-lg" style={{ maxWidth: '500px', animation: 'fadeIn 0.25s ease' }}>
+                  <Card.Body className="p-3">
+                    <h6 className="fw-bold mb-3 text-light">Create New Board</h6>
+                    <Form onSubmit={handleCreateBoard}>
+                      <Form.Group className="mb-3">
+                        <Form.Label className="small text-secondary">Board Name</Form.Label>
+                        <Form.Control
+                          type="text"
+                          value={boardName}
+                          onChange={(e) => setBoardName(e.target.value)}
+                          required
+                          className="bg-dark text-light border-secondary py-2"
+                          placeholder="e.g. Autumn Sprint, Development Road..."
+                          style={{ fontSize: '0.9rem' }}
+                        />
+                      </Form.Group>
+                      <div className="d-flex justify-content-end gap-2">
+                        {boardName && (
+                          <Button 
+                            variant="outline-warning" 
+                            size="sm" 
+                            onClick={() => setBoardName('')}
+                            style={{ fontSize: '0.8rem' }}
+                          >
+                            Clear
+                          </Button>
+                        )}
+                        <Button 
+                          variant="outline-secondary" 
+                          size="sm" 
+                          onClick={() => { setShowCreate(false); setBoardName(''); }}
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button 
+                          type="submit" 
+                          variant="primary" 
+                          size="sm"
+                          style={{ fontSize: '0.8rem', paddingLeft: '15px', paddingRight: '15px' }}
+                        >
+                          Create
+                        </Button>
+                      </div>
                     </Form>
                   </Card.Body>
                 </Card>

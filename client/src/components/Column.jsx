@@ -18,12 +18,12 @@ export default function Column({ column, tasks, members, allTasks = [], onAddTas
     <div
       className="d-flex flex-column rounded-3 p-0"
       style={{
-        minWidth: 280,
-        maxWidth: 320,
-        flex: '1 1 280px',
+        minWidth: 310,
+        maxWidth: 350,
+        flex: '1 1 310px',
         backgroundColor: 'rgba(30,30,46,0.7)',
         border: '1px solid rgba(255,255,255,0.08)',
-        maxHeight: 'calc(100vh - 80px)',
+        maxHeight: 'calc(100vh - 120px)',
         overflow: 'hidden',
       }}
     >

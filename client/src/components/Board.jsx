@@ -141,7 +141,7 @@ function BoardInner() {
       {/* Kanban View */}
       {viewMode === 'kanban' && (
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="d-flex gap-3 p-3" style={{ overflowX: 'auto', minHeight: 'calc(100vh - 120px)' }}>
+          <div className="d-flex gap-4 p-4" style={{ overflowX: 'auto', minHeight: 'calc(100vh - 120px)' }}>
             {sortedColumns.map((col) => {
               const colTasks = tasks
                 .filter((t) => t.columnId.toString() === col._id.toString())

@@ -70,12 +70,11 @@ function computeLayout(tasks) {
     layers.get(d).push(t);
   });
 
-  // Position nodes
-  const NODE_W = 180;
-  const NODE_H = 56;
-  const H_GAP = 80;
-  const V_GAP = 24;
-  const PADDING = 40;
+  const NODE_W = 220;
+  const NODE_H = 64;
+  const H_GAP = 140;
+  const V_GAP = 36;
+  const PADDING = 60;
 
   const maxLayer = Math.max(...layers.keys(), 0);
   const nodes = [];
@@ -241,19 +240,19 @@ export default function DependencyGraph({ tasks }) {
               {/* Task title (truncated) */}
               <text
                 x={node.x + 26}
-                y={node.y + 22}
+                y={node.y + 26}
                 fill="#e0e0e0"
                 fontSize={12}
                 fontWeight={600}
                 fontFamily="Inter, sans-serif"
               >
-                {node.task.title.length > 18 ? node.task.title.slice(0, 18) + '…' : node.task.title}
+                {node.task.title.length > 24 ? node.task.title.slice(0, 24) + '…' : node.task.title}
               </text>
 
               {/* Status label */}
               <text
                 x={node.x + 26}
-                y={node.y + 40}
+                y={node.y + 46}
                 fill={color}
                 fontSize={10}
                 fontFamily="Inter, sans-serif"
