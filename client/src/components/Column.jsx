@@ -10,7 +10,7 @@ const columnColors = {
   'Done': '#10b981',
 };
 
-export default function Column({ column, tasks, members, allTasks = [], onAddTask, onEditTask, onDeleteTask, onCompleteTask, canEdit }) {
+export default function Column({ column, tasks, members, allTasks = [], onAddTask, onEditTask, onDeleteTask, onCompleteTask, canEdit, onTaskClick }) {
   const accentColor = columnColors[column.name] || '#6366f1';
   const droppableId = column._id.toString();
 
@@ -100,6 +100,7 @@ export default function Column({ column, tasks, members, allTasks = [], onAddTas
                         onComplete={onCompleteTask}
                         canEdit={canEdit}
                         isDragging={dragSnapshot.isDragging}
+                        onTaskClick={onTaskClick}
                       />
                     </div>
                   )}

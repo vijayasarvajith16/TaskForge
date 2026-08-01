@@ -5,6 +5,7 @@ import RegisterPage from './pages/RegisterPage';
 import WorkspacePage from './pages/WorkspacePage';
 import BoardsPage from './pages/BoardsPage';
 import Board from './components/Board';
+import DashboardPage from './pages/DashboardPage';
 import { Spinner } from 'react-bootstrap';
 
 function ProtectedRoute({ children }) {
@@ -37,6 +38,7 @@ function AppRoutes() {
       <Route path="/workspace" element={<ProtectedRoute><WorkspacePage /></ProtectedRoute>} />
       <Route path="/boards" element={<ProtectedRoute><BoardsPage /></ProtectedRoute>} />
       <Route path="/board/:boardId" element={<ProtectedRoute><Board /></ProtectedRoute>} />
+      <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/login" />} />
     </Routes>
   );

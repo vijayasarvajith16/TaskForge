@@ -9,6 +9,7 @@ export function BoardProvider({ boardId, children }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [socketInstance, setSocketInstance] = useState(null);
   const tasksRef = useRef(tasks);
 
   // Keep ref in sync for use in callbacks
@@ -41,6 +42,7 @@ export function BoardProvider({ boardId, children }) {
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
+    setSocketInstance(socket);
 
     joinBoard(boardId);
 
@@ -191,7 +193,7 @@ export function BoardProvider({ boardId, children }) {
   return (
     <BoardContext.Provider
       value={{
-        board, tasks, loading, error, setError,
+        board, tasks, loading, error, setError, socket: socketInstance,
         loadData, setBoard,
         moveTask: handleMoveTask,
         createTask: handleCreateTask,

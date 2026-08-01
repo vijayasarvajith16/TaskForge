@@ -18,6 +18,8 @@ export const createWorkspace = (data) => api.post('/workspaces', data);
 export const getWorkspace = (id) => api.get(`/workspaces/${id}`);
 export const generateInvite = (id) => api.post(`/workspaces/${id}/invite`);
 export const joinWorkspace = (code) => api.post(`/workspaces/join/${code}`);
+export const getWorkload = (id) => api.get(`/workspaces/${id}/workload`);
+export const getLeaderboard = (id, params) => api.get(`/workspaces/${id}/leaderboard`, { params });
 
 // ─── Boards ────────────────────────────────────────
 export const getBoards = (workspaceId) => api.get('/boards', { params: { workspaceId } });
@@ -27,11 +29,14 @@ export const deleteBoard = (id) => api.delete(`/boards/${id}`);
 
 // ─── Tasks ─────────────────────────────────────────
 export const getTasks = (boardId) => api.get('/tasks', { params: { boardId } });
+export const getTaskDetail = (id) => api.get(`/tasks/${id}/detail`);
+export const getTaskActivity = (id) => api.get(`/tasks/${id}/activity`);
 export const createTask = (data) => api.post('/tasks', data);
 export const updateTask = (id, data) => api.patch(`/tasks/${id}`, data);
 export const moveTask = (id, data) => api.patch(`/tasks/${id}/move`, data);
 export const completeTask = (id) => api.patch(`/tasks/${id}/complete`);
 export const deleteTask = (id) => api.delete(`/tasks/${id}`);
+export const addComment = (taskId, text) => api.post(`/tasks/${taskId}/comments`, { text });
 
 // ─── Templates ─────────────────────────────────────
 export const getTemplates = (workspaceId) => api.get('/templates', { params: { workspaceId } });
@@ -43,6 +48,11 @@ export const deleteTemplate = (id) => api.delete(`/templates/${id}`);
 export const getNotifications = () => api.get('/notifications');
 export const markNotificationRead = (id) => api.patch(`/notifications/${id}/read`);
 export const markAllNotificationsRead = () => api.patch('/notifications/read-all');
+
+// ─── Polls ─────────────────────────────────────────
+export const getPolls = (boardId) => api.get(`/boards/${boardId}/polls`);
+export const createPoll = (boardId, data) => api.post(`/boards/${boardId}/polls`, data);
+export const votePoll = (pollId, optionIndex) => api.post(`/polls/${pollId}/vote`, { optionIndex });
 
 // ─── Escalation (testing) ──────────────────────────
 export const triggerEscalation = () => api.post('/escalation/run');

@@ -3,6 +3,9 @@ const { authenticate } = require('../middleware/auth');
 const { createTask, findByBoard, findTaskById, updateTask, bulkUpdateStatus, deleteTask } = require('../models/tasks');
 const { findBoardById } = require('../models/boards');
 const { computeStatus, findDirectDependents, validateDependencies } = require('../utils/dependencies');
+const { logActivity, findByTask: findActivityByTask } = require('../models/activityLogs');
+const { createComment, findByTask: findCommentsByTask } = require('../models/comments');
+const { findUserById } = require('../models/users');
 
 const router = express.Router();
 
@@ -27,6 +30,73 @@ router.get('/', authenticate, async (req, res) => {
   }
 });
 
+// GET /api/tasks/:id/detail — get task detail with activity log and comments
+router.get('/:id/detail', authenticate, async (req, res) => {
+  try {
+    const task = await findTaskById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    const [activity, comments] = await Promise.all([
+      findActivityByTask(req.params.id),
+      findCommentsByTask(req.params.id),
+    ]);
+
+    res.json({ task, activity, comments });
+  } catch (err) {
+    console.error('Get task detail error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/tasks/:id/activity — activity feed for a task
+router.get('/:id/activity', authenticate, async (req, res) => {
+  try {
+    const activity = await findActivityByTask(req.params.id);
+    res.json(activity);
+  } catch (err) {
+    console.error('Get activity error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/tasks/:id/comments — add a comment
+router.post('/:id/comments', authenticate, async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Comment text is required' });
+
+    const task = await findTaskById(req.params.id);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    const comment = await createComment({
+      taskId: req.params.id,
+      userId: req.user._id.toString(),
+      text: text.trim(),
+    });
+
+    // Activity log
+    await logActivity({
+      taskId: req.params.id,
+      userId: req.user._id.toString(),
+      action: 'commented',
+      detail: `${req.user.name} commented: "${text.trim().slice(0, 60)}${text.length > 60 ? '…' : ''}"`,
+    });
+
+    // Broadcast via Socket.io
+    const boardId = task.boardId.toString();
+    const io = req.app.get('io');
+    io.to(boardId).emit('comment_added', {
+      taskId: req.params.id,
+      comment: { ...comment, userName: req.user.name },
+    });
+
+    res.status(201).json({ ...comment, userName: req.user.name });
+  } catch (err) {
+    console.error('Create comment error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/tasks — create a task
 router.post('/', authenticate, async (req, res) => {
   try {
@@ -47,11 +117,9 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Members can only create tasks assigned to themselves' });
     }
 
-    // Validate dependencies if provided
     let validatedDeps = [];
     if (dependsOn && dependsOn.length > 0) {
       const allTasks = await findByBoard(boardId);
-      // For new tasks, we don't have an ID yet, so skip cycle check (no other task can depend on a non-existent task)
       const boardTaskIds = new Set(allTasks.map((t) => t._id.toString()));
       for (const depId of dependsOn) {
         if (!boardTaskIds.has(depId)) {
@@ -62,6 +130,26 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     const task = await createTask({ boardId, columnId, title, description, assignedTo, dueDate, dependsOn: validatedDeps });
+
+    // Activity log
+    await logActivity({
+      taskId: task._id.toString(),
+      userId: req.user._id.toString(),
+      action: 'created',
+      detail: `${req.user.name} created this task`,
+    });
+
+    if (assignedTo) {
+      const assignee = await findUserById(assignedTo);
+      if (assignee) {
+        await logActivity({
+          taskId: task._id.toString(),
+          userId: req.user._id.toString(),
+          action: 'assigned',
+          detail: `${req.user.name} assigned this to ${assignee.name}`,
+        });
+      }
+    }
 
     // If the task has dependencies, compute its initial status
     if (validatedDeps.length > 0) {
@@ -84,7 +172,7 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// PATCH /api/tasks/:id/move — move a task to a different column/position (drag-and-drop)
+// PATCH /api/tasks/:id/move — move a task to a different column/position
 router.patch('/:id/move', authenticate, async (req, res) => {
   try {
     const { columnId, order } = req.body;
@@ -95,7 +183,6 @@ router.patch('/:id/move', authenticate, async (req, res) => {
     const task = await findTaskById(req.params.id);
     if (!task) return res.status(404).json({ error: 'Task not found' });
 
-    // Locked tasks cannot be moved
     if (task.status === 'locked') {
       return res.status(400).json({ error: 'Locked tasks cannot be moved' });
     }
@@ -105,8 +192,21 @@ router.patch('/:id/move', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
+    const oldColId = task.columnId.toString();
     const updated = await updateTask(req.params.id, { columnId, order });
     const boardId = task.boardId.toString();
+
+    // Activity log: only log if column actually changed
+    if (oldColId !== columnId) {
+      const newCol = board.columns.find((c) => c._id.toString() === columnId);
+      const oldCol = board.columns.find((c) => c._id.toString() === oldColId);
+      await logActivity({
+        taskId: req.params.id,
+        userId: req.user._id.toString(),
+        action: 'moved',
+        detail: `${req.user.name} moved this from ${oldCol?.name || '?'} to ${newCol?.name || '?'}`,
+      });
+    }
 
     const io = req.app.get('io');
     io.to(boardId).emit('task_moved', {
@@ -134,7 +234,7 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
     }
 
     if (task.status === 'done') {
-      return res.json(task); // Already done, no-op
+      return res.json(task);
     }
 
     const board = await findBoardById(task.boardId.toString());
@@ -142,17 +242,22 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Members can only complete tasks assigned to them
     if (req.user.role === 'member' && task.assignedTo && task.assignedTo.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: 'Members can only complete tasks assigned to them' });
     }
 
     const boardId = task.boardId.toString();
 
-    // 1. Mark this task as done
     const completedTask = await updateTask(req.params.id, { status: 'done' });
 
-    // 2. Find direct dependents and recompute their status
+    // Activity log
+    await logActivity({
+      taskId: req.params.id,
+      userId: req.user._id.toString(),
+      action: 'completed',
+      detail: `${req.user.name} marked this as done`,
+    });
+
     const allTasks = await findByBoard(boardId);
     const dependents = findDirectDependents(req.params.id, allTasks);
     const unlockedIds = [];
@@ -168,17 +273,14 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
       }
     }
 
-    // 3. Bulk-update unlocked tasks
     if (statusUpdates.length > 0) {
       await bulkUpdateStatus(statusUpdates);
     }
 
-    // 4. Broadcast events
     const io = req.app.get('io');
     io.to(boardId).emit('task_updated', { task: completedTask });
 
     if (unlockedIds.length > 0) {
-      // Fetch the updated tasks so clients get full data
       const updatedAll = await findByBoard(boardId);
       const unlockedTasks = updatedAll.filter((t) => unlockedIds.includes(t._id.toString()));
       io.to(boardId).emit('tasks_unlocked', {
@@ -218,7 +320,6 @@ router.patch('/:id', authenticate, async (req, res) => {
       if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
 
-    // Validate dependencies if being updated
     if (updates.dependsOn) {
       const allTasks = await findByBoard(task.boardId.toString());
       const validation = validateDependencies(req.params.id, updates.dependsOn, allTasks);
@@ -227,7 +328,32 @@ router.patch('/:id', authenticate, async (req, res) => {
       }
     }
 
+    // Track assignment changes for logging
+    const oldAssignee = task.assignedTo?.toString();
+    const newAssignee = updates.assignedTo;
+
     const updated = await updateTask(req.params.id, updates);
+
+    // Activity log for assignment change
+    if (newAssignee && newAssignee !== oldAssignee) {
+      const assignee = await findUserById(newAssignee);
+      await logActivity({
+        taskId: req.params.id,
+        userId: req.user._id.toString(),
+        action: 'assigned',
+        detail: `${req.user.name} assigned this to ${assignee?.name || 'someone'}`,
+      });
+    }
+
+    // Activity log for other updates
+    if (updates.title || updates.description || updates.dueDate) {
+      await logActivity({
+        taskId: req.params.id,
+        userId: req.user._id.toString(),
+        action: 'updated',
+        detail: `${req.user.name} updated this task`,
+      });
+    }
 
     // Recompute status if dependsOn changed
     if (updates.dependsOn) {

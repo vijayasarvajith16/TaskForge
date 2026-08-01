@@ -1,7 +1,7 @@
 import { Card, Badge, Button, OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { Calendar, User, Trash2, Edit2, Lock, CheckCircle, Link2 } from 'lucide-react';
 
-export default function TaskCard({ task, members, allTasks = [], onEdit, onDelete, onComplete, canEdit, isDragging = false }) {
+export default function TaskCard({ task, members, allTasks = [], onEdit, onDelete, onComplete, canEdit, isDragging = false, onTaskClick }) {
   const assignee = members.find((m) => m._id.toString() === task.assignedTo?.toString());
   const isLocked = task.status === 'locked';
   const isDone = task.status === 'done';
@@ -47,13 +47,13 @@ export default function TaskCard({ task, members, allTasks = [], onEdit, onDelet
         transition: 'transform 0.15s, box-shadow 0.15s, opacity 0.2s',
         borderColor: isDragging ? '#6366f1' : isLocked ? '#4a4a5a' : undefined,
         boxShadow: isDragging ? '0 8px 25px rgba(99, 102, 241, 0.3)' : undefined,
-        cursor: isLocked ? 'not-allowed' : 'grab',
+        cursor: isLocked ? 'not-allowed' : 'pointer',
         opacity: isLocked ? 0.5 : 1,
         backgroundColor: isLocked ? '#1a1a2e' : '#1e1e2e',
         border: `1px solid ${isLocked ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.08)'}`,
       }}
     >
-      <Card.Body className="p-3">
+      <Card.Body className="p-3" onClick={() => onTaskClick && onTaskClick(task._id.toString())}>
         <div className="d-flex justify-content-between align-items-start mb-1">
           <div className="d-flex align-items-center gap-1">
             {isLocked && (

@@ -7,6 +7,8 @@ import Column from './Column';
 import TaskForm from './TaskForm';
 import DependencyGraph from './DependencyGraph';
 import NotificationBell from './NotificationBell';
+import TaskDetailDrawer from './TaskDetailDrawer';
+import PollsPanel from './PollsPanel';
 import { Button, Spinner, Alert, ButtonGroup } from 'react-bootstrap';
 import { ArrowLeft, Plus, LayoutGrid, GitBranch } from 'lucide-react';
 
@@ -15,42 +17,33 @@ function BoardInner() {
   const { user, workspace } = useAuth();
   const navigate = useNavigate();
   const {
-    board, tasks, loading, error, setError,
+    board, tasks, loading, error, setError, socket,
     loadData, moveTask, createTask, updateTask, completeTask, deleteTask,
   } = useBoard();
 
-  // View mode: 'kanban' or 'graph'
   const [viewMode, setViewMode] = useState('kanban');
-
-  // Task form state
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [defaultColumnId, setDefaultColumnId] = useState(null);
 
+  // Task detail drawer
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
+
   const members = workspace?.members || [];
   const canEdit = user?.role === 'head' || user?.role === 'joint_head';
 
-  // Initial data load
   useEffect(() => {
     if (user?.workspaceId) {
       loadData(user.workspaceId);
     }
   }, [user, loadData]);
 
-  // ── Drag-and-drop handler ──────────────────────
   const handleDragEnd = (result) => {
     const { draggableId, destination, source } = result;
-
     if (!destination) return;
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    ) return;
-
-    // Don't allow dragging locked tasks (also enforced in Column via isDragDisabled)
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
     const draggedTask = tasks.find((t) => t._id.toString() === draggableId);
     if (draggedTask?.status === 'locked') return;
-
     moveTask(draggableId, destination.droppableId, destination.index);
   };
 
@@ -75,9 +68,11 @@ function BoardInner() {
       }
       setShowForm(false);
       setEditingTask(null);
-    } catch {
-      // Error already set in context
-    }
+    } catch { /* Error already set in context */ }
+  };
+
+  const handleTaskClick = (taskId) => {
+    setDrawerTaskId(taskId);
   };
 
   if (loading) {
@@ -105,24 +100,20 @@ function BoardInner() {
         </div>
         <div className="d-flex align-items-center gap-2">
           <NotificationBell token={localStorage.getItem('token')} />
-          {/* View toggle */}
           <ButtonGroup size="sm">
             <Button
               variant={viewMode === 'kanban' ? 'primary' : 'outline-secondary'}
-              onClick={() => setViewMode('kanban')}
-              title="Kanban View"
+              onClick={() => setViewMode('kanban')} title="Kanban View"
             >
               <LayoutGrid size={14} className="me-1" /> Kanban
             </Button>
             <Button
               variant={viewMode === 'graph' ? 'primary' : 'outline-secondary'}
-              onClick={() => setViewMode('graph')}
-              title="Dependency Graph"
+              onClick={() => setViewMode('graph')} title="Dependency Graph"
             >
               <GitBranch size={14} className="me-1" /> Graph
             </Button>
           </ButtonGroup>
-
           {canEdit && (
             <Button variant="primary" size="sm" onClick={() => handleAddTask(board?.columns?.[0]?._id?.toString())}>
               <Plus size={14} className="me-1" /> New Task
@@ -137,18 +128,24 @@ function BoardInner() {
         </Alert>
       )}
 
+      {/* Polls at the top of the board */}
+      {viewMode === 'kanban' && (
+        <PollsPanel
+          boardId={boardId}
+          userId={user?._id?.toString()}
+          canManage={canEdit}
+          socket={socket}
+        />
+      )}
+
       {/* Kanban View */}
       {viewMode === 'kanban' && (
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div
-            className="d-flex gap-3 p-3"
-            style={{ overflowX: 'auto', minHeight: 'calc(100vh - 60px)' }}
-          >
+          <div className="d-flex gap-3 p-3" style={{ overflowX: 'auto', minHeight: 'calc(100vh - 120px)' }}>
             {sortedColumns.map((col) => {
               const colTasks = tasks
                 .filter((t) => t.columnId.toString() === col._id.toString())
                 .sort((a, b) => a.order - b.order);
-
               return (
                 <Column
                   key={col._id.toString()}
@@ -161,6 +158,7 @@ function BoardInner() {
                   onDeleteTask={deleteTask}
                   onCompleteTask={completeTask}
                   canEdit={canEdit}
+                  onTaskClick={handleTaskClick}
                 />
               );
             })}
@@ -185,11 +183,20 @@ function BoardInner() {
         members={members}
         allTasks={tasks}
       />
+
+      {/* Task detail drawer */}
+      <TaskDetailDrawer
+        show={!!drawerTaskId}
+        onHide={() => setDrawerTaskId(null)}
+        taskId={drawerTaskId}
+        members={members}
+        socket={socket}
+        boardId={boardId}
+      />
     </div>
   );
 }
 
-// Wrapper that provides BoardContext
 export default function Board() {
   const { boardId } = useParams();
   return (

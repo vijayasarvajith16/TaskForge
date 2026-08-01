@@ -8,7 +8,7 @@ import NotificationBell from '../components/NotificationBell';
 import {
   Container, Card, Row, Col, Button, Form, Alert, Badge, Spinner, Tab, Nav,
 } from 'react-bootstrap';
-import { LayoutDashboard, Plus, Trash2, LogOut, Users, FileText, Edit2, Copy } from 'lucide-react';
+import { LayoutDashboard, Plus, Trash2, LogOut, Users, FileText, Edit2, Copy, BarChart3 } from 'lucide-react';
 
 export default function BoardsPage() {
   const { user, workspace, logout, refreshWorkspace } = useAuth();
@@ -118,6 +118,9 @@ export default function BoardsPage() {
         <div className="d-flex align-items-center gap-3">
           <Button variant="outline-light" size="sm" onClick={() => navigate('/workspace')}>
             <Users size={14} className="me-1" /> Workspace
+          </Button>
+          <Button variant="outline-info" size="sm" onClick={() => navigate('/dashboard')}>
+            <BarChart3 size={14} className="me-1" /> Dashboard
           </Button>
           <NotificationBell token={localStorage.getItem('token')} />
           <Badge bg="secondary" className="text-capitalize">{user?.role?.replace('_', ' ')}</Badge>

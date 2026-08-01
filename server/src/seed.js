@@ -174,6 +174,46 @@ async function seed() {
 
   await db.collection('tasks').insertMany(tasks);
 
+  // ─── Phase 6: Activity Logs ──────────────────────
+  await db.collection('activityLogs').deleteMany({});
+  await db.collection('comments').deleteMany({});
+  await db.collection('polls').deleteMany({});
+
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+  const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000);
+  const thirtyMinAgo = new Date(now.getTime() - 30 * 60 * 1000);
+
+  const activityLogs = [
+    { taskId: taskAId, userId: headId, action: 'created', detail: 'Priya Sharma created this task', timestamp: twoHoursAgo },
+    { taskId: taskAId, userId: headId, action: 'assigned', detail: 'Priya Sharma assigned this to Maya Nair', timestamp: twoHoursAgo },
+    { taskId: taskBId, userId: headId, action: 'created', detail: 'Priya Sharma created this task', timestamp: twoHoursAgo },
+    { taskId: taskBId, userId: headId, action: 'assigned', detail: 'Priya Sharma assigned this to Arjun Patel', timestamp: twoHoursAgo },
+    { taskId: taskCId, userId: jhId, action: 'created', detail: 'Arjun Patel created this task', timestamp: oneHourAgo },
+    { taskId: taskAId, userId: memberId, action: 'commented', detail: 'Maya Nair commented: "Working on the first draft now"', timestamp: thirtyMinAgo },
+  ];
+  await db.collection('activityLogs').insertMany(activityLogs);
+
+  // ─── Phase 6: Comments ───────────────────────────
+  const comments = [
+    { taskId: taskAId, userId: memberId, text: 'Working on the first draft now — should have something to review by tomorrow.', createdAt: thirtyMinAgo },
+    { taskId: taskAId, userId: headId, text: 'Great! Make sure to use the brand colors from the style guide.', createdAt: new Date(thirtyMinAgo.getTime() + 5 * 60 * 1000) },
+  ];
+  await db.collection('comments').insertMany(comments);
+
+  // ─── Phase 6: Poll ──────────────────────────────
+  const pollClosesAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  await db.collection('polls').insertOne({
+    boardId,
+    question: 'Which venue should we use for final interviews?',
+    options: [
+      { text: 'Seminar Hall A', votes: [headId] },
+      { text: 'Conference Room B', votes: [jhId, memberId] },
+      { text: 'Open-air amphitheatre', votes: [] },
+    ],
+    closesAt: pollClosesAt,
+    createdAt: oneHourAgo,
+  });
+
   // ─── Demo Template: Freshers Induction ─────────────
   const bp1 = new ObjectId().toString();
   const bp2 = new ObjectId().toString();
@@ -206,6 +246,11 @@ async function seed() {
   console.log('Workspace: HR Team Alpha');
   console.log('Invite code: DEMO2026');
   console.log(`Board: Recruitment Drive - August (${tasks.length} tasks)`);
+  console.log('');
+  console.log('Phase 6 demo data:');
+  console.log(`  ${activityLogs.length} activity log entries`);
+  console.log(`  ${comments.length} comments on "Design recruitment poster"`);
+  console.log('  1 active poll: "Which venue for final interviews?"');
   console.log('');
   console.log('Dependency chain: Design poster → Print posters → Distribute posters');
   console.log('  "Print posters" is LOCKED (depends on "Design poster")');
