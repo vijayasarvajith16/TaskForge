@@ -76,8 +76,9 @@ export default function WorkspacePage() {
     return (
       <div className="min-vh-100 bg-dark text-light">
         <nav className="navbar navbar-dark bg-dark border-bottom border-secondary px-3">
-          <span className="navbar-brand fw-bold">
-            <span className="text-primary">Task</span>Forge
+          <span className="navbar-brand fw-bold d-flex align-items-center gap-2">
+            <img src="/logo.png" alt="TaskForge Logo" style={{ width: 24, height: 24 }} />
+            <span><span className="text-primary">Task</span>Forge</span>
           </span>
           <div className="d-flex align-items-center gap-3">
             <Button variant="outline-light" size="sm" onClick={() => navigate('/boards')}>

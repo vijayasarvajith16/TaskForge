@@ -45,8 +45,9 @@ export default function DashboardPage() {
           <Button variant="link" className="text-secondary p-0" onClick={() => navigate('/boards')}>
             <ArrowLeft size={18} />
           </Button>
-          <span className="navbar-brand fw-bold mb-0">
-            <span className="text-primary">Task</span>Forge
+          <span className="navbar-brand fw-bold mb-0 d-flex align-items-center gap-2">
+            <img src="/logo.png" alt="TaskForge Logo" style={{ width: 24, height: 24 }} />
+            <span><span className="text-primary">Task</span>Forge</span>
           </span>
         </div>
         <div className="d-flex align-items-center gap-3">

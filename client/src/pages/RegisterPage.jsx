@@ -33,8 +33,9 @@ export default function RegisterPage() {
         <Card className="bg-dark text-light border border-secondary shadow-lg">
           <Card.Body className="p-4">
             <div className="text-center mb-4">
-              <h2 className="fw-bold" style={{ letterSpacing: '-0.5px' }}>
-                <span className="text-primary">Task</span>Forge
+              <h2 className="fw-bold d-flex align-items-center justify-content-center gap-2" style={{ letterSpacing: '-0.5px' }}>
+                <img src="/logo.png" alt="TaskForge Logo" style={{ width: 32, height: 32 }} />
+                <span><span className="text-primary">Task</span>Forge</span>
               </h2>
               <p className="text-secondary small mb-0">Create your account</p>
             </div>
