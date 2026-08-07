@@ -1,39 +1,48 @@
-import { Card, Badge, Button, OverlayTrigger, Tooltip } from 'react-bootstrap';
-import { Calendar, User, Trash2, Edit2, Lock, CheckCircle, Link2 } from 'lucide-react';
+import { OverlayTrigger, Tooltip } from 'react-bootstrap';
+import { Calendar, Lock, CheckCircle, Edit2, Trash2, Link2 } from 'lucide-react';
 
-export default function TaskCard({ task, members, allTasks = [], onEdit, onDelete, onComplete, canEdit, isDragging = false, onTaskClick }) {
-  const assignee = members.find((m) => m._id.toString() === task.assignedTo?.toString());
-  const isLocked = task.status === 'locked';
-  const isDone = task.status === 'done';
+const STATUS_COLORS = {
+  open:        { bg: 'rgba(87,157,255,0.15)',  color: 'var(--col-todo)',       label: 'Open' },
+  in_progress: { bg: 'rgba(96,198,210,0.15)',  color: 'var(--col-inprogress)', label: 'In Progress' },
+  blocked:     { bg: 'rgba(245,205,71,0.15)',   color: 'var(--col-blocked)',    label: 'Blocked' },
+  done:        { bg: 'rgba(75,206,151,0.15)',   color: 'var(--col-done)',       label: 'Done' },
+  locked:      { bg: 'rgba(115,132,150,0.15)', color: 'var(--tf-text-muted)',  label: 'Locked' },
+};
+
+function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(' ');
+  return (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+}
+
+const formatDate = (d) => {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+};
+
+export default function TaskCard({
+  task, members, allTasks = [],
+  onEdit, onDelete, onComplete, canEdit, isDragging = false, onTaskClick,
+}) {
+  const assignee  = members.find((m) => m._id.toString() === task.assignedTo?.toString());
+  const isLocked  = task.status === 'locked';
+  const isDone    = task.status === 'done';
   const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !isDone;
 
-  const statusColors = {
-    open: 'primary',
-    in_progress: 'info',
-    blocked: 'warning',
-    done: 'success',
-    locked: 'secondary',
-  };
+  const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS.open;
 
-  const formatDate = (d) => {
-    if (!d) return null;
-    return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-  };
-
-  // Get blocker names for locked tasks
+  // Blocker names for tooltip
   const blockerNames = [];
-  if (isLocked && task.dependsOn?.length > 0 && allTasks.length > 0) {
+  if (isLocked && task.dependsOn?.length > 0) {
     for (const depId of task.dependsOn) {
       const dep = allTasks.find((t) => t._id.toString() === depId.toString());
-      if (dep && dep.status !== 'done') {
-        blockerNames.push(dep.title);
-      }
+      if (dep && dep.status !== 'done') blockerNames.push(dep.title);
     }
   }
 
-  // Get all dependency names for tooltip
+  // Dependency names
   const depNames = [];
-  if (task.dependsOn?.length > 0 && allTasks.length > 0) {
+  if (task.dependsOn?.length > 0) {
     for (const depId of task.dependsOn) {
       const dep = allTasks.find((t) => t._id.toString() === depId.toString());
       if (dep) depNames.push(dep.title);
@@ -41,107 +50,127 @@ export default function TaskCard({ task, members, allTasks = [], onEdit, onDelet
   }
 
   return (
-    <Card
-      className={`mb-2 shadow-sm task-card ${isDragging ? 'shadow-lg' : ''}`}
-      style={{
-        transition: 'transform 0.15s, box-shadow 0.15s, opacity 0.2s',
-        borderColor: isDragging ? '#6366f1' : isLocked ? '#4a4a5a' : undefined,
-        boxShadow: isDragging ? '0 8px 25px rgba(99, 102, 241, 0.3)' : undefined,
-        cursor: isLocked ? 'not-allowed' : 'pointer',
-        opacity: isLocked ? 0.5 : 1,
-        backgroundColor: isLocked ? '#1a1a2e' : '#1e1e2e',
-        border: `1px solid ${isLocked ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.08)'}`,
-      }}
+    <div
+      className={`tf-card ${isDragging ? 'is-dragging' : ''} ${isLocked ? 'is-locked' : ''} ${isDone ? 'is-done' : ''}`}
+      onClick={() => !isLocked && onTaskClick?.(task._id.toString())}
     >
-      <Card.Body className="p-3" onClick={() => onTaskClick && onTaskClick(task._id.toString())}>
-        <div className="d-flex justify-content-between align-items-start mb-1">
-          <div className="d-flex align-items-center gap-1">
-            {isLocked && (
-              <OverlayTrigger
-                placement="top"
-                overlay={
-                  <Tooltip>
-                    <strong>Blocked by:</strong><br />
-                    {blockerNames.length > 0 ? blockerNames.join(', ') : 'Unresolved dependencies'}
-                  </Tooltip>
-                }
-              >
-                <Lock size={13} className="text-secondary me-1 flex-shrink-0" />
-              </OverlayTrigger>
-            )}
-            <h6 className={`mb-0 fw-semibold ${isLocked ? 'text-secondary' : 'text-light'}`} style={{ fontSize: '0.9rem' }}>
-              {task.title}
-            </h6>
-          </div>
-          <Badge bg={statusColors[task.status] || 'secondary'} className="text-capitalize flex-shrink-0 ms-1" style={{ fontSize: '0.65rem' }}>
-            {task.status.replace('_', ' ')}
-          </Badge>
-        </div>
+      {/* Status label bar (colored strip at top) */}
+      <div
+        style={{
+          height: 3,
+          borderRadius: '4px 4px 0 0',
+          background: statusStyle.color,
+          opacity: 0.7,
+          margin: '-10px -12px 8px',
+          width: 'calc(100% + 24px)',
+        }}
+      />
 
-        {task.description && (
-          <p className="text-secondary small mb-2" style={{ fontSize: '0.78rem' }}>
-            {task.description.length > 80 ? task.description.slice(0, 80) + '…' : task.description}
-          </p>
-        )}
-
-        {/* Dependency indicator */}
-        {depNames.length > 0 && (
+      {/* Title row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 4 }}>
+        {isLocked && (
           <OverlayTrigger
             placement="top"
             overlay={
               <Tooltip>
-                <strong>Depends on:</strong><br />
-                {depNames.join(', ')}
+                <strong>Blocked by:</strong><br />
+                {blockerNames.length > 0 ? blockerNames.join(', ') : 'Unresolved dependencies'}
               </Tooltip>
             }
           >
-            <span className="d-inline-flex align-items-center text-secondary mb-2" style={{ fontSize: '0.7rem', cursor: 'help' }}>
-              <Link2 size={11} className="me-1" /> {depNames.length} {depNames.length === 1 ? 'dependency' : 'dependencies'}
-            </span>
+            <Lock size={11} style={{ color: 'var(--tf-text-muted)', marginTop: 2, flexShrink: 0 }} />
           </OverlayTrigger>
         )}
+        <p className={`tf-card-title ${isDone ? 'done' : ''}`} style={{ flex: 1, margin: 0 }}>
+          {task.title}
+        </p>
+      </div>
 
-        <div className="d-flex justify-content-between align-items-center">
-          <div className="d-flex align-items-center gap-2">
-            {assignee && (
-              <OverlayTrigger placement="top" overlay={<Tooltip>{assignee.name}</Tooltip>}>
-                <span className="d-inline-flex align-items-center text-secondary" style={{ fontSize: '0.75rem' }}>
-                  <User size={12} className="me-1" /> {assignee.name.split(' ')[0]}
-                </span>
-              </OverlayTrigger>
-            )}
-            {task.dueDate && (
-              <span className={`d-inline-flex align-items-center ${isOverdue ? 'text-danger' : 'text-secondary'}`} style={{ fontSize: '0.75rem' }}>
-                <Calendar size={12} className="me-1" /> {formatDate(task.dueDate)}
-              </span>
-            )}
-          </div>
+      {/* Description snippet */}
+      {task.description && (
+        <p className="tf-card-desc">
+          {task.description.length > 90 ? task.description.slice(0, 90) + '…' : task.description}
+        </p>
+      )}
 
-          <div className="d-flex gap-1">
-            {/* Complete button — shown when task is not done and not locked */}
-            {canEdit && !isDone && !isLocked && (
-              <OverlayTrigger placement="top" overlay={<Tooltip>Mark as done</Tooltip>}>
-                <Button
-                  variant="link" size="sm" className="p-0 text-success"
-                  onClick={(e) => { e.stopPropagation(); onComplete?.(task._id); }}
-                >
-                  <CheckCircle size={14} />
-                </Button>
-              </OverlayTrigger>
-            )}
-            {canEdit && !isLocked && (
-              <>
-                <Button variant="link" size="sm" className="p-0 text-secondary" onClick={() => onEdit(task)}>
-                  <Edit2 size={13} />
-                </Button>
-                <Button variant="link" size="sm" className="p-0 text-danger" onClick={() => onDelete(task._id)}>
-                  <Trash2 size={13} />
-                </Button>
-              </>
-            )}
-          </div>
+      {/* Deps chip */}
+      {depNames.length > 0 && (
+        <OverlayTrigger
+          placement="top"
+          overlay={<Tooltip><strong>Depends on:</strong><br />{depNames.join(', ')}</Tooltip>}
+        >
+          <span className="tf-chip dep" style={{ marginBottom: 7, cursor: 'help' }}>
+            <Link2 size={10} /> {depNames.length} dep{depNames.length > 1 ? 's' : ''}
+          </span>
+        </OverlayTrigger>
+      )}
+
+      {/* Footer: meta + actions */}
+      <div className="tf-card-footer">
+        <div className="tf-card-meta">
+          {/* Due date */}
+          {task.dueDate && (
+            <span className={`tf-chip ${isOverdue ? 'overdue' : ''}`}>
+              <Calendar size={10} /> {formatDate(task.dueDate)}
+            </span>
+          )}
+          {/* Status chip (small) */}
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 7px',
+              borderRadius: 20,
+              fontSize: 10,
+              fontWeight: 600,
+              background: statusStyle.bg,
+              color: statusStyle.color,
+              border: `1px solid ${statusStyle.color}30`,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {statusStyle.label}
+          </span>
         </div>
-      </Card.Body>
-    </Card>
+
+        <div className="tf-card-actions" style={{ display: 'flex', alignItems: 'center', gap: 2, opacity: undefined }}>
+          {/* Assignee avatar */}
+          {assignee && (
+            <OverlayTrigger placement="top" overlay={<Tooltip>{assignee.name}</Tooltip>}>
+              <div className="tf-member-avatar" style={{ marginRight: 4 }}>
+                {initials(assignee.name)}
+              </div>
+            </OverlayTrigger>
+          )}
+          {/* Action icons */}
+          {canEdit && !isDone && !isLocked && (
+            <OverlayTrigger placement="top" overlay={<Tooltip>Mark done</Tooltip>}>
+              <button
+                className="tf-icon-btn complete"
+                onClick={(e) => { e.stopPropagation(); onComplete?.(task._id); }}
+              >
+                <CheckCircle size={13} />
+              </button>
+            </OverlayTrigger>
+          )}
+          {canEdit && !isLocked && (
+            <>
+              <button
+                className="tf-icon-btn"
+                onClick={(e) => { e.stopPropagation(); onEdit(task); }}
+              >
+                <Edit2 size={12} />
+              </button>
+              <button
+                className="tf-icon-btn delete"
+                onClick={(e) => { e.stopPropagation(); onDelete(task._id); }}
+              >
+                <Trash2 size={12} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

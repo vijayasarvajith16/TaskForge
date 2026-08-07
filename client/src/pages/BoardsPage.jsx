@@ -1,40 +1,61 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { getBoards, createBoard, deleteBoard, getTemplates, createTemplate, updateTemplate, deleteTemplate, createBoardFromTemplate } from '../api';
+import {
+  getBoards, createBoard, deleteBoard,
+  getTemplates, createTemplate, updateTemplate, deleteTemplate,
+  createBoardFromTemplate,
+} from '../api';
 import TemplateEditor from '../components/TemplateEditor';
 import CreateFromTemplate from '../components/CreateFromTemplate';
 import NotificationBell from '../components/NotificationBell';
+import { Spinner, Alert } from 'react-bootstrap';
 import {
-  Container, Card, Row, Col, Button, Form, Alert, Badge, Spinner, Tab, Nav,
-} from 'react-bootstrap';
-import { LayoutDashboard, Plus, Trash2, LogOut, Users, FileText, Edit2, Copy, BarChart3 } from 'lucide-react';
+  LayoutDashboard, Plus, Trash2, LogOut, Users, FileText,
+  Edit2, Copy, BarChart3, Calendar, Zap, ChevronRight,
+} from 'lucide-react';
+
+// Board cover gradients — cycles through a palette
+const COVER_GRADIENTS = [
+  'linear-gradient(135deg,#1e3a5f 0%,#0f2340 100%)',
+  'linear-gradient(135deg,#1a3a2a 0%,#0f2318 100%)',
+  'linear-gradient(135deg,#3a1a2a 0%,#230f18 100%)',
+  'linear-gradient(135deg,#2a2a1a 0%,#1a1a0f 100%)',
+  'linear-gradient(135deg,#1a1a3a 0%,#0f0f23 100%)',
+  'linear-gradient(135deg,#2a1a1a 0%,#1a0f0f 100%)',
+];
+
+function getBoardGradient(id) {
+  const idx = id ? id.charCodeAt(id.length - 1) % COVER_GRADIENTS.length : 0;
+  return COVER_GRADIENTS[idx];
+}
+
+function initials(name) {
+  if (!name) return '?';
+  const p = name.trim().split(' ');
+  return (p[0][0] + (p[1]?.[0] || '')).toUpperCase();
+}
 
 export default function BoardsPage() {
   const { user, workspace, logout, refreshWorkspace } = useAuth();
   const navigate = useNavigate();
 
-  const [boards, setBoards] = useState([]);
+  const [boards, setBoards]       = useState([]);
   const [templates, setTemplates] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]     = useState(true);
+  const [activeTab, setActiveTab] = useState('boards');
   const [showCreate, setShowCreate] = useState(false);
-  const [boardName, setBoardName] = useState('');
-  const [error, setError] = useState('');
+  const [boardName, setBoardName]   = useState('');
+  const [error, setError]           = useState('');
 
-  // Template editor state
   const [showTemplateEditor, setShowTemplateEditor] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState(null);
-
-  // Create from template state
-  const [showFromTemplate, setShowFromTemplate] = useState(false);
+  const [editingTemplate, setEditingTemplate]       = useState(null);
+  const [showFromTemplate, setShowFromTemplate]     = useState(false);
 
   const canManage = user?.role === 'head' || user?.role === 'joint_head';
 
   useEffect(() => {
-    if (!user?.workspaceId) {
-      navigate('/workspace');
-      return;
-    }
+    if (!user?.workspaceId) { navigate('/workspace'); return; }
     loadData();
     if (!workspace) refreshWorkspace();
   }, [user]);
@@ -109,238 +130,305 @@ export default function BoardsPage() {
   };
 
   return (
-    <div className="min-vh-100 bg-dark text-light">
-      {/* Navbar */}
-      <nav className="navbar navbar-dark bg-dark border-bottom border-secondary px-3">
-        <span className="navbar-brand fw-bold d-flex align-items-center gap-2">
-          <img src="/logo.png" alt="TaskForge Logo" style={{ width: 24, height: 24 }} />
-          <span><span className="text-primary">Task</span>Forge</span>
-        </span>
-        <div className="d-flex align-items-center gap-3">
-          <Button variant="outline-light" size="sm" onClick={() => navigate('/workspace')}>
-            <Users size={14} className="me-1" /> Workspace
-          </Button>
-          <Button variant="outline-info" size="sm" onClick={() => navigate('/dashboard')}>
-            <BarChart3 size={14} className="me-1" /> Dashboard
-          </Button>
-          <NotificationBell token={localStorage.getItem('token')} />
-          <Badge bg="secondary" className="text-capitalize">{user?.role?.replace('_', ' ')}</Badge>
-          <span className="text-secondary small">{user?.name}</span>
-          <Button variant="outline-danger" size="sm" onClick={logout}>
-            <LogOut size={14} />
-          </Button>
+    <div style={{ minHeight: '100vh', background: 'var(--tf-bg)', display: 'flex', flexDirection: 'column' }}>
+
+      {/* ── Trello-style top navbar ── */}
+      <div className="tf-navbar">
+        <a className="tf-navbar-brand" style={{ cursor: 'default' }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 6,
+            background: 'linear-gradient(135deg,var(--tf-accent) 0%,#ae4cfc 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Zap size={15} color="#fff" />
+          </div>
+          <span><span className="tf-brand-blue">Task</span>Forge</span>
+        </a>
+
+        {/* Tab strip */}
+        <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+          {[
+            { key: 'boards', icon: <LayoutDashboard size={13} />, label: 'Boards' },
+            ...(canManage ? [{ key: 'templates', icon: <FileText size={13} />, label: 'Templates' }] : []),
+          ].map(({ key, icon, label }) => (
+            <button
+              key={key}
+              className={`tf-navbar-btn ${activeTab === key ? 'active' : ''}`}
+              onClick={() => setActiveTab(key)}
+            >
+              {icon} {label}
+            </button>
+          ))}
         </div>
-      </nav>
 
-      <Container className="py-4" style={{ maxWidth: 1000 }}>
-        {error && <Alert variant="danger" className="py-2 small" dismissible onClose={() => setError('')}>{error}</Alert>}
+        {/* Right side */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="tf-navbar-btn" onClick={() => navigate('/dashboard')}>
+            <BarChart3 size={13} /> Dashboard
+          </button>
+          <button className="tf-navbar-btn" onClick={() => navigate('/workspace')}>
+            <Users size={13} /> Workspace
+          </button>
+          <NotificationBell token={localStorage.getItem('token')} />
+          {/* Avatar */}
+          <div
+            className="tf-avatar"
+            title={`${user?.name} • ${user?.role?.replace('_', ' ')}`}
+            onClick={logout}
+          >
+            {user?.name ? initials(user.name) : '?'}
+          </div>
+        </div>
+      </div>
 
-        <Tab.Container defaultActiveKey="boards">
-          <Nav variant="tabs" className="mb-4 border-secondary">
-            <Nav.Item>
-              <Nav.Link eventKey="boards">
-                <LayoutDashboard size={15} className="me-1" /> Boards
-              </Nav.Link>
-            </Nav.Item>
-            {canManage && (
-              <Nav.Item>
-                <Nav.Link eventKey="templates">
-                  <FileText size={15} className="me-1" /> Templates
-                </Nav.Link>
-              </Nav.Item>
-            )}
-          </Nav>
+      {/* ── Body ── */}
+      <div style={{ flex: 1, padding: '28px 32px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+        {error && (
+          <Alert variant="danger" className="py-2 small mb-3" dismissible onClose={() => setError('')}>
+            {error}
+          </Alert>
+        )}
 
-          <Tab.Content>
-            {/* ── Boards Tab ───────────────── */}
-            <Tab.Pane eventKey="boards">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h4 className="fw-bold mb-0">
-                  <LayoutDashboard size={22} className="me-2 text-primary" />
+        {/* ══ BOARDS TAB ══════════════════════════════════════════════════════ */}
+        {activeTab === 'boards' && (
+          <>
+            {/* Section header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <p className="tf-section-header" style={{ margin: 0 }}>
+                  {workspace?.name || 'Your workspace'}
+                </p>
+                <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--tf-text-strong)', margin: 0 }}>
                   Boards
-                </h4>
-                {canManage && (
-                  <div className="d-flex gap-2">
-                    {templates.length > 0 && (
-                      <Button variant="outline-primary" size="sm" onClick={() => setShowFromTemplate(true)}>
-                        <Copy size={14} className="me-1" /> From Template
-                      </Button>
-                    )}
-                    <Button variant="primary" size="sm" onClick={() => setShowCreate(!showCreate)}>
-                      <Plus size={14} className="me-1" /> New Board
-                    </Button>
-                  </div>
-                )}
+                </h2>
               </div>
-
-              {showCreate && (
-                <Card className="bg-dark border-secondary mb-4 shadow-lg" style={{ maxWidth: '500px', animation: 'fadeIn 0.25s ease' }}>
-                  <Card.Body className="p-3">
-                    <h6 className="fw-bold mb-3 text-light">Create New Board</h6>
-                    <Form onSubmit={handleCreateBoard}>
-                      <Form.Group className="mb-3">
-                        <Form.Label className="small text-secondary">Board Name</Form.Label>
-                        <Form.Control
-                          type="text"
-                          value={boardName}
-                          onChange={(e) => setBoardName(e.target.value)}
-                          required
-                          className="bg-dark text-light border-secondary py-2"
-                          placeholder="e.g. Autumn Sprint, Development Road..."
-                          style={{ fontSize: '0.9rem' }}
-                        />
-                      </Form.Group>
-                      <div className="d-flex justify-content-end gap-2">
-                        {boardName && (
-                          <Button 
-                            variant="outline-warning" 
-                            size="sm" 
-                            onClick={() => setBoardName('')}
-                            style={{ fontSize: '0.8rem' }}
-                          >
-                            Clear
-                          </Button>
-                        )}
-                        <Button 
-                          variant="outline-secondary" 
-                          size="sm" 
-                          onClick={() => { setShowCreate(false); setBoardName(''); }}
-                          style={{ fontSize: '0.8rem' }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          type="submit" 
-                          variant="primary" 
-                          size="sm"
-                          style={{ fontSize: '0.8rem', paddingLeft: '15px', paddingRight: '15px' }}
-                        >
-                          Create
-                        </Button>
-                      </div>
-                    </Form>
-                  </Card.Body>
-                </Card>
-              )}
-
-              {loading ? (
-                <div className="text-center py-5"><Spinner animation="border" variant="primary" /></div>
-              ) : boards.length === 0 ? (
-                <Card className="bg-dark border-secondary text-center py-5">
-                  <Card.Body>
-                    <LayoutDashboard size={40} className="text-secondary mb-3" />
-                    <p className="text-secondary">No boards yet.{canManage && ' Create one to get started!'}</p>
-                  </Card.Body>
-                </Card>
-              ) : (
-                <Row className="g-3">
-                  {boards.map((board) => (
-                    <Col md={6} lg={4} key={board._id.toString()}>
-                      <Card
-                        className="bg-dark border-secondary h-100 shadow-sm"
-                        style={{ cursor: 'pointer', transition: 'transform 0.15s, border-color 0.15s' }}
-                        onClick={() => navigate(`/board/${board._id}`)}
-                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.borderColor = '#6366f1'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = ''; e.currentTarget.style.borderColor = ''; }}
-                      >
-                        <Card.Body className="d-flex flex-column">
-                          <h6 className="fw-bold text-light mb-2">{board.name}</h6>
-                          <div className="d-flex gap-1 flex-wrap mb-2">
-                            {board.columns?.map((c) => (
-                              <Badge key={c._id.toString()} bg="secondary" className="fw-normal" style={{ fontSize: '0.65rem' }}>
-                                {c.name}
-                              </Badge>
-                            ))}
-                          </div>
-                          {board.eventDate && (
-                            <Badge bg="info" className="mb-2 align-self-start" style={{ fontSize: '0.65rem' }}>
-                              Event: {new Date(board.eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </Badge>
-                          )}
-                          <div className="mt-auto d-flex justify-content-between align-items-center">
-                            <span className="text-secondary" style={{ fontSize: '0.7rem' }}>
-                              {new Date(board.createdAt).toLocaleDateString()}
-                            </span>
-                            {canManage && (
-                              <Button
-                                variant="link" size="sm" className="p-0 text-danger"
-                                onClick={(e) => { e.stopPropagation(); handleDeleteBoard(board._id); }}
-                              >
-                                <Trash2 size={14} />
-                              </Button>
-                            )}
-                          </div>
-                        </Card.Body>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              )}
-            </Tab.Pane>
-
-            {/* ── Templates Tab ────────────── */}
-            {canManage && (
-              <Tab.Pane eventKey="templates">
-                <div className="d-flex justify-content-between align-items-center mb-4">
-                  <h4 className="fw-bold mb-0">
-                    <FileText size={22} className="me-2 text-primary" />
-                    Event Templates
-                  </h4>
-                  <Button variant="primary" size="sm" onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }}>
-                    <Plus size={14} className="me-1" /> New Template
-                  </Button>
+              {canManage && (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {templates.length > 0 && (
+                    <button className="tf-navbar-btn" onClick={() => setShowFromTemplate(true)}>
+                      <Copy size={13} /> From Template
+                    </button>
+                  )}
+                  <button
+                    className="tf-navbar-btn active"
+                    onClick={() => setShowCreate(!showCreate)}
+                    style={{ fontWeight: 600 }}
+                  >
+                    <Plus size={14} /> Create board
+                  </button>
                 </div>
+              )}
+            </div>
 
-                {templates.length === 0 ? (
-                  <Card className="bg-dark border-secondary text-center py-5">
-                    <Card.Body>
-                      <FileText size={40} className="text-secondary mb-3" />
-                      <p className="text-secondary">No templates yet. Create reusable event blueprints!</p>
-                    </Card.Body>
-                  </Card>
-                ) : (
-                  <Row className="g-3">
-                    {templates.map((tmpl) => (
-                      <Col md={6} lg={4} key={tmpl._id.toString()}>
-                        <Card className="bg-dark border-secondary h-100 shadow-sm">
-                          <Card.Body className="d-flex flex-column">
-                            <h6 className="fw-bold text-light mb-2">{tmpl.name}</h6>
-                            <div className="d-flex gap-1 flex-wrap mb-2">
-                              <Badge bg="primary" style={{ fontSize: '0.65rem' }}>
-                                {tmpl.taskBlueprint?.length || 0} tasks
-                              </Badge>
-                              {tmpl.taskBlueprint?.some((bp) => bp.dependsOn?.length > 0) && (
-                                <Badge bg="warning" text="dark" style={{ fontSize: '0.65rem' }}>
-                                  Has dependencies
-                                </Badge>
-                              )}
-                            </div>
-                            <div className="small text-secondary mb-2" style={{ fontSize: '0.75rem' }}>
-                              {tmpl.taskBlueprint?.slice(0, 3).map((bp) => bp.title).join(', ')}
-                              {(tmpl.taskBlueprint?.length || 0) > 3 && '…'}
-                            </div>
-                            <div className="mt-auto d-flex justify-content-end gap-1">
-                              <Button
-                                variant="outline-primary" size="sm"
-                                onClick={() => { setEditingTemplate(tmpl); setShowTemplateEditor(true); }}
-                              >
-                                <Edit2 size={12} className="me-1" /> Edit
-                              </Button>
-                              <Button variant="outline-danger" size="sm" onClick={() => handleDeleteTemplate(tmpl._id)}>
-                                <Trash2 size={12} />
-                              </Button>
-                            </div>
-                          </Card.Body>
-                        </Card>
-                      </Col>
-                    ))}
-                  </Row>
-                )}
-              </Tab.Pane>
+            {/* Inline create form */}
+            {showCreate && (
+              <div style={{
+                background: 'var(--tf-col-bg)',
+                border: '1px solid var(--tf-border)',
+                borderRadius: 10,
+                padding: '16px 20px',
+                marginBottom: 20,
+                maxWidth: 420,
+                animation: 'fadeIn 0.2s ease',
+              }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--tf-text-strong)', marginBottom: 12 }}>
+                  Create board
+                </p>
+                <form onSubmit={handleCreateBoard}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={boardName}
+                    onChange={(e) => setBoardName(e.target.value)}
+                    placeholder="Board title"
+                    required
+                    autoFocus
+                    style={{ marginBottom: 10 }}
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="submit" className="tf-navbar-btn active" style={{ fontWeight: 600, height: 34, padding: '0 16px' }}>
+                      Create
+                    </button>
+                    <button
+                      type="button"
+                      className="tf-navbar-btn"
+                      onClick={() => { setShowCreate(false); setBoardName(''); }}
+                      style={{ height: 34 }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
             )}
-          </Tab.Content>
-        </Tab.Container>
-      </Container>
+
+            {/* Board grid */}
+            {loading ? (
+              <div style={{ textAlign: 'center', paddingTop: 60 }}>
+                <Spinner animation="border" variant="primary" />
+              </div>
+            ) : boards.length === 0 ? (
+              <div style={{
+                textAlign: 'center', padding: '60px 20px',
+                background: 'var(--tf-col-bg)', borderRadius: 12,
+                border: '1px dashed var(--tf-border)',
+              }}>
+                <LayoutDashboard size={40} style={{ color: 'var(--tf-text-muted)', marginBottom: 12 }} />
+                <p style={{ color: 'var(--tf-text-muted)', fontSize: 14 }}>
+                  No boards yet.{canManage ? ' Create one above to get started!' : ''}
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                gap: 14,
+              }}>
+                {boards.map((board) => (
+                  <div
+                    key={board._id.toString()}
+                    className="tf-board-card"
+                    onClick={() => navigate(`/board/${board._id}`)}
+                  >
+                    {/* Colored cover */}
+                    <div
+                      className="tf-board-card-cover"
+                      style={{ background: getBoardGradient(board._id.toString()) }}
+                    >
+                      {board.eventDate && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 600,
+                          background: 'rgba(255,255,255,0.15)',
+                          padding: '2px 8px', borderRadius: 20, color: '#fff',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}>
+                          <Calendar size={9} />
+                          {new Date(board.eventDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Body */}
+                    <div className="tf-board-card-body">
+                      <p className="tf-board-card-title">{board.name}</p>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {board.columns?.slice(0, 4).map((c) => (
+                          <span key={c._id.toString()} style={{
+                            fontSize: 10, padding: '1px 6px', borderRadius: 3,
+                            background: 'rgba(255,255,255,0.07)',
+                            color: 'var(--tf-text-muted)', fontWeight: 500,
+                          }}>
+                            {c.name}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 11, color: 'var(--tf-text-muted)' }}>
+                          {new Date(board.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                          {canManage && (
+                            <button
+                              className="tf-icon-btn delete"
+                              onClick={(e) => { e.stopPropagation(); handleDeleteBoard(board._id); }}
+                              title="Delete board"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                          <ChevronRight size={13} style={{ color: 'var(--tf-text-muted)' }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ══ TEMPLATES TAB ═══════════════════════════════════════════════════ */}
+        {activeTab === 'templates' && canManage && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--tf-text-strong)', margin: 0 }}>
+                Event Templates
+              </h2>
+              <button
+                className="tf-navbar-btn active"
+                onClick={() => { setEditingTemplate(null); setShowTemplateEditor(true); }}
+                style={{ fontWeight: 600 }}
+              >
+                <Plus size={14} /> New Template
+              </button>
+            </div>
+
+            {templates.length === 0 ? (
+              <div style={{
+                textAlign: 'center', padding: '60px 20px',
+                background: 'var(--tf-col-bg)', borderRadius: 12,
+                border: '1px dashed var(--tf-border)',
+              }}>
+                <FileText size={40} style={{ color: 'var(--tf-text-muted)', marginBottom: 12 }} />
+                <p style={{ color: 'var(--tf-text-muted)', fontSize: 14 }}>
+                  No templates yet. Create reusable event blueprints!
+                </p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                gap: 14,
+              }}>
+                {templates.map((tmpl) => (
+                  <div key={tmpl._id.toString()} style={{
+                    background: 'var(--tf-col-bg)',
+                    border: '1px solid var(--tf-border)',
+                    borderRadius: 10,
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    transition: 'var(--tf-transition)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--tf-text-strong)', margin: 0 }}>
+                        {tmpl.name}
+                      </p>
+                      <span style={{
+                        fontSize: 11, padding: '2px 8px', borderRadius: 20,
+                        background: 'rgba(87,157,255,0.15)', color: 'var(--tf-accent)',
+                        fontWeight: 600, whiteSpace: 'nowrap',
+                      }}>
+                        {tmpl.taskBlueprint?.length || 0} tasks
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--tf-text-muted)', margin: 0, lineHeight: 1.5 }}>
+                      {tmpl.taskBlueprint?.slice(0, 3).map((bp) => bp.title).join(' · ')}
+                      {(tmpl.taskBlueprint?.length || 0) > 3 ? ' …' : ''}
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                      <button
+                        className="tf-navbar-btn"
+                        style={{ flex: 1, justifyContent: 'center' }}
+                        onClick={() => { setEditingTemplate(tmpl); setShowTemplateEditor(true); }}
+                      >
+                        <Edit2 size={12} /> Edit
+                      </button>
+                      <button
+                        className="tf-navbar-btn danger"
+                        onClick={() => handleDeleteTemplate(tmpl._id)}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Modals */}
       <TemplateEditor
@@ -349,7 +437,6 @@ export default function BoardsPage() {
         onSave={handleSaveTemplate}
         template={editingTemplate}
       />
-
       <CreateFromTemplate
         show={showFromTemplate}
         onHide={() => setShowFromTemplate(false)}

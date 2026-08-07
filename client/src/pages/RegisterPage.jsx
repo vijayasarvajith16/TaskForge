@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Card, Form, Button, Alert } from 'react-bootstrap';
+import { Alert } from 'react-bootstrap';
+import { Zap } from 'lucide-react';
 
 export default function RegisterPage() {
   const { registerUser } = useAuth();
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [name, setName]       = useState('');
+  const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('member');
-  const [error, setError] = useState('');
+  const [role, setRole]       = useState('member');
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -28,81 +29,91 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center bg-dark">
-      <Container style={{ maxWidth: 440 }}>
-        <Card className="bg-dark text-light border border-secondary shadow-lg">
-          <Card.Body className="p-4">
-            <div className="text-center mb-4">
-              <h2 className="fw-bold d-flex align-items-center justify-content-center gap-2" style={{ letterSpacing: '-0.5px' }}>
-                <img src="/logo.png" alt="TaskForge Logo" style={{ width: 32, height: 32 }} />
-                <span><span className="text-primary">Task</span>Forge</span>
-              </h2>
-              <p className="text-secondary small mb-0">Create your account</p>
-            </div>
+    <div className="tf-auth-wrapper">
+      <div className="tf-auth-card">
+        {/* Logo */}
+        <div className="tf-auth-logo">
+          <div style={{
+            width: 36, height: 36, borderRadius: 8,
+            background: 'linear-gradient(135deg, var(--tf-accent) 0%, #ae4cfc 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Zap size={20} color="#fff" />
+          </div>
+          <span><span style={{ color: 'var(--tf-accent)' }}>Task</span>Forge</span>
+        </div>
+        <p className="tf-auth-subtitle">Create your account — it's free</p>
 
-            {error && <Alert variant="danger" className="py-2 small">{error}</Alert>}
+        {error && (
+          <Alert variant="danger" className="py-2 mb-3" style={{ fontSize: 13 }}>
+            {error}
+          </Alert>
+        )}
 
-            <Form onSubmit={handleSubmit}>
-              <Form.Group className="mb-3">
-                <Form.Label className="small text-secondary">Name</Form.Label>
-                <Form.Control
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="bg-dark text-light border-secondary"
-                  placeholder="Your name"
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label className="small text-secondary">Email</Form.Label>
-                <Form.Control
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="bg-dark text-light border-secondary"
-                  placeholder="you@example.com"
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label className="small text-secondary">Password</Form.Label>
-                <Form.Control
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  className="bg-dark text-light border-secondary"
-                  placeholder="Min 6 characters"
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label className="small text-secondary">Role</Form.Label>
-                <Form.Select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="bg-dark text-light border-secondary"
-                >
-                  <option value="member">Member</option>
-                  <option value="head">Head</option>
-                  <option value="joint_head">Joint Head</option>
-                </Form.Select>
-              </Form.Group>
-              <Button type="submit" variant="primary" className="w-100 fw-semibold" disabled={loading}>
-                {loading ? 'Creating…' : 'Create Account'}
-              </Button>
-            </Form>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 12 }}>
+            <label className="form-label">Full Name</label>
+            <input
+              type="text"
+              className="form-control"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              placeholder="Jane Smith"
+            />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label className="form-label">Email</label>
+            <input
+              type="email"
+              className="form-control"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="you@example.com"
+            />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <label className="form-label">Password</label>
+            <input
+              type="password"
+              className="form-control"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              placeholder="Min 6 characters"
+            />
+          </div>
+          <div style={{ marginBottom: 20 }}>
+            <label className="form-label">Role</label>
+            <select
+              className="form-select"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
+              <option value="member">Member</option>
+              <option value="head">Head</option>
+              <option value="joint_head">Joint Head</option>
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{ width: '100%', height: 40, fontSize: 14, fontWeight: 600 }}
+            disabled={loading}
+          >
+            {loading ? 'Creating account…' : 'Create account'}
+          </button>
+        </form>
 
-            <p className="text-center text-secondary small mt-3 mb-0">
-              Already have an account?{' '}
-              <Link to="/login" className="text-primary text-decoration-none">
-                Sign in
-              </Link>
-            </p>
-          </Card.Body>
-        </Card>
-      </Container>
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--tf-text-muted)', marginTop: 18, marginBottom: 0 }}>
+          Already have an account?{' '}
+          <Link to="/login" style={{ color: 'var(--tf-accent)', textDecoration: 'none', fontWeight: 500 }}>
+            Sign in
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

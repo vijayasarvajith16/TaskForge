@@ -9,20 +9,29 @@ import DependencyGraph from './DependencyGraph';
 import NotificationBell from './NotificationBell';
 import TaskDetailDrawer from './TaskDetailDrawer';
 import PollsPanel from './PollsPanel';
-import { Button, Spinner, Alert, ButtonGroup, Modal } from 'react-bootstrap';
-import { ArrowLeft, Plus, LayoutGrid, GitBranch, CalendarDays, Copy, RefreshCw, Download, ExternalLink } from 'lucide-react';
+import { Modal, Spinner, Alert } from 'react-bootstrap';
+import {
+  ArrowLeft, Plus, LayoutGrid, GitBranch,
+  CalendarDays, Copy, RefreshCw, Download, ExternalLink,
+  Zap, BarChart3,
+} from 'lucide-react';
 import { generateCalendarToken, revokeCalendarToken } from '../api';
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function initials(name) {
+  if (!name) return '?';
+  const p = name.trim().split(' ');
+  return (p[0][0] + (p[1]?.[0] || '')).toUpperCase();
+}
+
 // ── CalendarModal ─────────────────────────────────────────────────────────────
-function CalendarModal({ show, onHide, board, boardId, onTokenChange }) {
+function CalendarModal({ show, onHide, board, boardId }) {
   const [calToken, setCalToken] = useState(board?.calendarToken || null);
   const [generating, setGenerating] = useState(false);
   const [revoking, setRevoking] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    setCalToken(board?.calendarToken || null);
-  }, [board]);
+  useEffect(() => setCalToken(board?.calendarToken || null), [board]);
 
   const feedUrl = calToken
     ? `${window.location.origin}/api/boards/${boardId}/calendar.ics?token=${calToken}`
@@ -30,32 +39,19 @@ function CalendarModal({ show, onHide, board, boardId, onTokenChange }) {
 
   const handleGenerate = async () => {
     setGenerating(true);
-    try {
-      const res = await generateCalendarToken(boardId);
-      setCalToken(res.data.calendarToken);
-      onTokenChange?.(res.data.calendarToken);
-    } catch (err) {
-      console.error('Generate token error', err);
-    } finally {
-      setGenerating(false);
-    }
+    try { const r = await generateCalendarToken(boardId); setCalToken(r.data.calendarToken); }
+    catch { /* ignore */ }
+    finally { setGenerating(false); }
   };
 
   const handleRevoke = async () => {
     setRevoking(true);
-    try {
-      await revokeCalendarToken(boardId);
-      setCalToken(null);
-      onTokenChange?.(null);
-    } catch (err) {
-      console.error('Revoke token error', err);
-    } finally {
-      setRevoking(false);
-    }
+    try { await revokeCalendarToken(boardId); setCalToken(null); }
+    catch { /* ignore */ }
+    finally { setRevoking(false); }
   };
 
   const handleCopy = () => {
-    if (!feedUrl) return;
     navigator.clipboard.writeText(feedUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -65,84 +61,61 @@ function CalendarModal({ show, onHide, board, boardId, onTokenChange }) {
     <Modal show={show} onHide={onHide} centered contentClassName="bg-dark text-light border-secondary">
       <Modal.Header closeButton closeVariant="white" className="border-secondary">
         <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2">
-          <CalendarDays size={18} className="text-primary" /> Calendar Export
+          <CalendarDays size={17} style={{ color: 'var(--tf-accent)' }} /> Calendar Export
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
         {calToken ? (
           <>
-            <p className="small text-secondary mb-2">
-              Subscribe to this live feed in Google Calendar or Apple Calendar — it updates automatically as tasks change.
+            <p style={{ fontSize: 12.5, color: 'var(--tf-text-muted)', marginBottom: 10 }}>
+              Subscribe to this live feed in Google Calendar or Apple Calendar.
             </p>
-
-            {/* Feed URL */}
-            <div
-              className="d-flex align-items-center gap-2 p-2 rounded mb-3"
-              style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
-            >
-              <code className="flex-grow-1 text-info" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 10px', borderRadius: 6,
+              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--tf-border)',
+              marginBottom: 12,
+            }}>
+              <code style={{ flex: 1, fontSize: 11, color: 'var(--tf-accent)', wordBreak: 'break-all' }}>
                 {feedUrl}
               </code>
-              <Button
-                variant={copied ? 'success' : 'outline-secondary'}
-                size="sm"
+              <button
+                className="tf-icon-btn"
                 onClick={handleCopy}
-                title="Copy URL"
-                style={{ flexShrink: 0 }}
+                title="Copy"
+                style={{ background: copied ? 'rgba(75,206,151,0.15)' : undefined, color: copied ? 'var(--col-done)' : undefined }}
               >
-                <Copy size={12} />
-              </Button>
+                <Copy size={13} />
+              </button>
             </div>
-
-            {/* Instructions */}
-            <div className="mb-3 p-2 rounded" style={{ backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
-              <p className="small mb-1 fw-semibold text-primary">How to subscribe:</p>
-              <ol className="small text-secondary mb-0 ps-3" style={{ lineHeight: 1.8 }}>
-                <li>Copy the URL above</li>
-                <li><strong className="text-light">Google Calendar</strong>: Other calendars → "From URL" → paste</li>
-                <li><strong className="text-light">Apple Calendar</strong>: File → New Calendar Subscription → paste</li>
-                <li><strong className="text-light">Outlook</strong>: Add calendar → From internet → paste</li>
-              </ol>
-            </div>
-
-            {/* Actions */}
-            <div className="d-flex gap-2 flex-wrap">
-              <a
-                href={`${feedUrl}&download=true`}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-outline-secondary btn-sm"
-              >
-                <Download size={12} className="me-1" /> Download .ics
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <a href={`${feedUrl}&download=true`} target="_blank" rel="noreferrer" className="tf-navbar-btn" style={{ textDecoration: 'none' }}>
+                <Download size={12} /> Download .ics
               </a>
-              <a
-                href={`webcal://${feedUrl.replace(/^https?:\/\//, '')}`}
-                className="btn btn-outline-info btn-sm"
-              >
-                <ExternalLink size={12} className="me-1" /> Open in Calendar App
+              <a href={`webcal://${feedUrl.replace(/^https?:\/\//, '')}`} className="tf-navbar-btn" style={{ textDecoration: 'none' }}>
+                <ExternalLink size={12} /> Open in Calendar
               </a>
-              <Button
-                variant="outline-danger"
-                size="sm"
+              <button
+                className="tf-navbar-btn danger"
                 onClick={handleRevoke}
                 disabled={revoking}
-                className="ms-auto"
-                title="Revoke this URL and generate a new token"
+                style={{ marginLeft: 'auto' }}
               >
-                {revoking ? <Spinner size="sm" className="me-1" /> : <RefreshCw size={12} className="me-1" />}
-                Revoke & Regenerate
-              </Button>
+                {revoking ? <Spinner size="sm" className="me-1" /> : <RefreshCw size={12} />} Revoke
+              </button>
             </div>
           </>
         ) : (
-          <div className="text-center py-3">
-            <CalendarDays size={40} className="text-secondary mb-3" />
-            <p className="text-secondary small mb-3">
-              Generate a secure feed URL to subscribe to this board's tasks in any calendar app.
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <CalendarDays size={36} style={{ color: 'var(--tf-text-muted)', marginBottom: 12 }} />
+            <p style={{ fontSize: 13, color: 'var(--tf-text-muted)', marginBottom: 16 }}>
+              Generate a secure URL to subscribe to this board's tasks in any calendar app.
             </p>
-            <Button variant="primary" onClick={handleGenerate} disabled={generating}>
-              {generating ? <><Spinner size="sm" className="me-1" />Generating…</> : 'Generate Calendar Feed'}
-            </Button>
+            <button className="tf-navbar-btn active" onClick={handleGenerate} disabled={generating}
+              style={{ margin: '0 auto', display: 'inline-flex', padding: '0 20px', height: 36 }}>
+              {generating ? <Spinner size="sm" className="me-1" /> : <CalendarDays size={13} />}
+              Generate Feed
+            </button>
           </div>
         )}
       </Modal.Body>
@@ -160,58 +133,38 @@ function BoardInner() {
     moveTask, createTask, updateTask, completeTask, deleteTask,
   } = useBoard();
 
-  const [viewMode, setViewMode] = useState('kanban');
-  const [showForm, setShowForm] = useState(false);
+  const [viewMode, setViewMode]       = useState('kanban');
+  const [showForm, setShowForm]       = useState(false);
   const [editingTask, setEditingTask] = useState(null);
-  const [defaultColumnId, setDefaultColumnId] = useState(null);
+  const [defaultColId, setDefaultColId] = useState(null);
   const [showCalendar, setShowCalendar] = useState(false);
-
-  // Task detail drawer
   const [drawerTaskId, setDrawerTaskId] = useState(null);
 
   const members = workspace?.members || [];
   const canEdit = user?.role === 'head' || user?.role === 'joint_head';
 
-  const handleDragEnd = (result) => {
-    const { draggableId, destination, source } = result;
+  const handleDragEnd = ({ draggableId, destination, source }) => {
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
-    const draggedTask = tasks.find((t) => t._id.toString() === draggableId);
-    if (draggedTask?.status === 'locked') return;
+    const dragged = tasks.find((t) => t._id.toString() === draggableId);
+    if (dragged?.status === 'locked') return;
     moveTask(draggableId, destination.droppableId, destination.index);
   };
 
-  const handleAddTask = (columnId) => {
-    setEditingTask(null);
-    setDefaultColumnId(columnId);
-    setShowForm(true);
-  };
-
-  const handleEditTask = (task) => {
-    setEditingTask(task);
-    setDefaultColumnId(null);
-    setShowForm(true);
-  };
+  const openCreateForm = (colId) => { setEditingTask(null); setDefaultColId(colId); setShowForm(true); };
+  const openEditForm   = (task)  => { setEditingTask(task); setDefaultColId(null); setShowForm(true); };
 
   const handleFormSubmit = async (data) => {
     try {
-      if (editingTask) {
-        await updateTask(editingTask._id, data);
-      } else {
-        await createTask({ ...data, columnId: data.columnId || defaultColumnId });
-      }
-      setShowForm(false);
-      setEditingTask(null);
-    } catch { /* Error already set in context */ }
-  };
-
-  const handleTaskClick = (taskId) => {
-    setDrawerTaskId(taskId);
+      if (editingTask) await updateTask(editingTask._id, data);
+      else await createTask({ ...data, columnId: data.columnId || defaultColId });
+      setShowForm(false); setEditingTask(null);
+    } catch { /* handled in context */ }
   };
 
   if (loading) {
     return (
-      <div className="min-vh-100 bg-dark d-flex align-items-center justify-content-center">
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--tf-bg)' }}>
         <Spinner animation="border" variant="primary" />
       </div>
     );
@@ -220,49 +173,72 @@ function BoardInner() {
   const sortedColumns = board?.columns ? [...board.columns].sort((a, b) => a.order - b.order) : [];
 
   return (
-    <div className="min-vh-100 bg-dark text-light">
-      {/* Board header */}
-      <div className="d-flex align-items-center justify-content-between px-3 py-2 border-bottom border-secondary">
-        <div className="d-flex align-items-center gap-2">
-          <Button variant="link" className="text-secondary p-0" onClick={() => navigate('/boards')}>
-            <ArrowLeft size={18} />
-          </Button>
-          <h5 className="mb-0 fw-bold">{board?.name || 'Board'}</h5>
-          <span className="badge bg-success bg-opacity-25 text-success" style={{ fontSize: '0.65rem' }}>
-            ● Live
+    <div className="tf-board-wrapper">
+      {/* ── Global navbar ── */}
+      <div className="tf-navbar">
+        {/* Logo */}
+        <a onClick={() => navigate('/boards')} className="tf-navbar-brand" style={{ cursor: 'pointer', textDecoration: 'none' }}>
+          <img src="/logo.png" alt="" className="brand-logo" />
+          <span><span className="tf-brand-blue">Task</span>Forge</span>
+        </a>
+
+        {/* Board name */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+          <button className="tf-navbar-btn" onClick={() => navigate('/boards')} style={{ padding: '0 8px' }}>
+            <ArrowLeft size={14} />
+          </button>
+          <h1
+            className="tf-board-title"
+            style={{ fontSize: 14, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+          >
+            {board?.name || 'Board'}
+          </h1>
+          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--col-done)', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span className="live-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--col-done)', display: 'inline-block' }} />
+            Live
           </span>
         </div>
-        <div className="d-flex align-items-center gap-2">
+
+        {/* Right controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <NotificationBell token={localStorage.getItem('token')} />
+
+          {/* View toggle */}
+          <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--tf-border)' }}>
+            <button
+              className={`tf-navbar-btn ${viewMode === 'kanban' ? 'active' : ''}`}
+              onClick={() => setViewMode('kanban')}
+              style={{ borderRadius: 0, border: 'none', borderRight: '1px solid var(--tf-border)' }}
+            >
+              <LayoutGrid size={13} /> Board
+            </button>
+            <button
+              className={`tf-navbar-btn ${viewMode === 'graph' ? 'active' : ''}`}
+              onClick={() => setViewMode('graph')}
+              style={{ borderRadius: 0, border: 'none' }}
+            >
+              <GitBranch size={13} /> Graph
+            </button>
+          </div>
+
           {canEdit && (
-            <Button
-              variant="outline-secondary"
-              size="sm"
-              onClick={() => setShowCalendar(true)}
-              title="Calendar Export"
-            >
-              <CalendarDays size={14} className="me-1" /> Calendar
-            </Button>
+            <button className="tf-navbar-btn" onClick={() => setShowCalendar(true)}>
+              <CalendarDays size={13} /> Calendar
+            </button>
           )}
-          <ButtonGroup size="sm">
-            <Button
-              variant={viewMode === 'kanban' ? 'primary' : 'outline-secondary'}
-              onClick={() => setViewMode('kanban')} title="Kanban View"
-            >
-              <LayoutGrid size={14} className="me-1" /> Kanban
-            </Button>
-            <Button
-              variant={viewMode === 'graph' ? 'primary' : 'outline-secondary'}
-              onClick={() => setViewMode('graph')} title="Dependency Graph"
-            >
-              <GitBranch size={14} className="me-1" /> Graph
-            </Button>
-          </ButtonGroup>
+
           {canEdit && (
-            <Button variant="primary" size="sm" onClick={() => handleAddTask(board?.columns?.[0]?._id?.toString())}>
-              <Plus size={14} className="me-1" /> New Task
-            </Button>
+            <button
+              className="tf-navbar-btn active"
+              onClick={() => openCreateForm(board?.columns?.[0]?._id?.toString())}
+              style={{ fontWeight: 600 }}
+            >
+              <Plus size={14} /> Add Card
+            </button>
           )}
+
+          {/* User avatar */}
+          <OverlayTriggerUser user={user} navigate={navigate} />
         </div>
       </div>
 
@@ -272,20 +248,15 @@ function BoardInner() {
         </Alert>
       )}
 
-      {/* Polls at the top of the board */}
+      {/* Polls */}
       {viewMode === 'kanban' && (
-        <PollsPanel
-          boardId={boardId}
-          userId={user?._id?.toString()}
-          canManage={canEdit}
-          socket={socket}
-        />
+        <PollsPanel boardId={boardId} userId={user?._id?.toString()} canManage={canEdit} socket={socket} />
       )}
 
-      {/* Kanban View */}
+      {/* ── Kanban ── */}
       {viewMode === 'kanban' && (
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="d-flex gap-4 p-4" style={{ overflowX: 'auto', minHeight: 'calc(100vh - 120px)' }}>
+          <div className="tf-board-canvas">
             {sortedColumns.map((col) => {
               const colTasks = tasks
                 .filter((t) => t.columnId.toString() === col._id.toString())
@@ -297,12 +268,12 @@ function BoardInner() {
                   tasks={colTasks}
                   members={members}
                   allTasks={tasks}
-                  onAddTask={() => handleAddTask(col._id.toString())}
-                  onEditTask={handleEditTask}
+                  onAddTask={() => openCreateForm(col._id.toString())}
+                  onEditTask={openEditForm}
                   onDeleteTask={deleteTask}
                   onCompleteTask={completeTask}
                   canEdit={canEdit}
-                  onTaskClick={handleTaskClick}
+                  onTaskClick={setDrawerTaskId}
                 />
               );
             })}
@@ -310,14 +281,14 @@ function BoardInner() {
         </DragDropContext>
       )}
 
-      {/* Dependency Graph View */}
+      {/* ── Graph ── */}
       {viewMode === 'graph' && (
-        <div className="p-3">
+        <div style={{ padding: 16 }}>
           <DependencyGraph tasks={tasks} />
         </div>
       )}
 
-      {/* Task form modal */}
+      {/* Modals / Drawers */}
       <TaskForm
         show={showForm}
         onHide={() => { setShowForm(false); setEditingTask(null); }}
@@ -327,8 +298,6 @@ function BoardInner() {
         members={members}
         allTasks={tasks}
       />
-
-      {/* Task detail drawer */}
       <TaskDetailDrawer
         show={!!drawerTaskId}
         onHide={() => setDrawerTaskId(null)}
@@ -337,14 +306,51 @@ function BoardInner() {
         socket={socket}
         boardId={boardId}
       />
-
-      {/* Calendar export modal */}
       <CalendarModal
         show={showCalendar}
         onHide={() => setShowCalendar(false)}
         board={board}
         boardId={boardId}
       />
+    </div>
+  );
+}
+
+// Small component to keep BoardInner readable
+function OverlayTriggerUser({ user, navigate }) {
+  const [open, setOpen] = useState(false);
+  const { logout } = useAuth();
+  return (
+    <div style={{ position: 'relative' }}>
+      <div className="tf-avatar" onClick={() => setOpen(!open)} title={user?.name}>
+        {user?.name ? (user.name.trim().split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2)) : '?'}
+      </div>
+      {open && (
+        <div
+          style={{
+            position: 'absolute', right: 0, top: 36, zIndex: 200,
+            background: 'var(--tf-col-bg)', border: '1px solid var(--tf-border)',
+            borderRadius: 8, boxShadow: 'var(--tf-shadow-md)',
+            minWidth: 160, padding: 6, animation: 'dropDown 0.15s ease',
+          }}
+          onMouseLeave={() => setOpen(false)}
+        >
+          <div style={{ padding: '6px 10px', fontSize: 12.5, color: 'var(--tf-text-muted)', borderBottom: '1px solid var(--tf-border)', marginBottom: 4 }}>
+            <strong style={{ color: 'var(--tf-text-strong)' }}>{user?.name}</strong><br />
+            <span style={{ textTransform: 'capitalize' }}>{user?.role?.replace('_', ' ')}</span>
+          </div>
+          <button className="tf-add-card-btn" style={{ width: '100%', margin: 0, padding: '7px 10px' }} onClick={() => { setOpen(false); navigate('/dashboard'); }}>
+            <BarChart3 size={13} /> Dashboard
+          </button>
+          <button className="tf-add-card-btn" style={{ width: '100%', margin: 0, padding: '7px 10px' }} onClick={() => { setOpen(false); navigate('/workspace'); }}>
+            <Zap size={13} /> Workspace
+          </button>
+          <hr style={{ margin: '4px 0', borderColor: 'var(--tf-border)' }} />
+          <button className="tf-add-card-btn" style={{ width: '100%', margin: 0, padding: '7px 10px', color: '#fc8181' }} onClick={logout}>
+            Sign out
+          </button>
+        </div>
+      )}
     </div>
   );
 }

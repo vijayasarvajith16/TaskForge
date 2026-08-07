@@ -1,199 +1,218 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Badge, Dropdown } from 'react-bootstrap';
-import { Bell, Check, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, Check } from 'lucide-react';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../api';
 import io from 'socket.io-client';
 
+const formatTime = (dateStr) => {
+  const d = new Date(dateStr);
+  const diff = Math.floor((Date.now() - d) / 60000);
+  if (diff < 1) return 'Just now';
+  if (diff < 60) return `${diff}m ago`;
+  const h = Math.floor(diff / 60);
+  if (h < 24) return `${h}h ago`;
+  return d.toLocaleDateString();
+};
+
+const cleanMessage = (msg) => msg.replace(/\[L\d\]\s*/, '');
+const getLevel    = (msg) => { const m = msg.match(/\[L(\d)\]/); return m ? parseInt(m[1]) : 0; };
+
+const LEVEL_COLORS = { 2: '#fc8181', 1: '#f5cd47', 0: 'var(--col-todo)' };
+
 export default function NotificationBell({ token }) {
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [show, setShow] = useState(false);
+  const [unreadCount, setUnreadCount]     = useState(0);
+  const [open, setOpen]                   = useState(false);
   const socketRef = useRef(null);
+  const panelRef  = useRef(null);
 
   const loadNotifications = useCallback(async () => {
     try {
       const res = await getNotifications();
       setNotifications(res.data.notifications);
       setUnreadCount(res.data.unreadCount);
-    } catch {
-      // Silently ignore
-    }
+    } catch { /* ignore */ }
   }, []);
 
-  // Initial load + poll every 30s
   useEffect(() => {
     loadNotifications();
-    const interval = setInterval(loadNotifications, 30000);
-    return () => clearInterval(interval);
+    const timer = setInterval(loadNotifications, 30000);
+    return () => clearInterval(timer);
   }, [loadNotifications]);
 
-  // Socket.io listener for live notifications
   useEffect(() => {
     if (!token) return;
-
-    const socket = io('http://localhost:3001', {
-      auth: { token },
-      transports: ['websocket'],
-    });
-
+    const socket = io('http://localhost:3001', { auth: { token }, transports: ['websocket'] });
     socket.on('notification', (notif) => {
-      setNotifications((prev) => [notif, ...prev]);
-      setUnreadCount((prev) => prev + 1);
+      setNotifications((p) => [notif, ...p]);
+      setUnreadCount((p) => p + 1);
     });
-
     socketRef.current = socket;
-
-    return () => {
-      socket.disconnect();
-    };
+    return () => socket.disconnect();
   }, [token]);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
   const handleMarkRead = async (id) => {
     try {
       await markNotificationRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n._id === id ? { ...n, read: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    } catch {
-      // Silently ignore
-    }
+      setNotifications((p) => p.map((n) => n._id === id ? { ...n, read: true } : n));
+      setUnreadCount((p) => Math.max(0, p - 1));
+    } catch { /* ignore */ }
   };
 
   const handleMarkAllRead = async () => {
     try {
       await markAllNotificationsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setNotifications((p) => p.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
-    } catch {
-      // Silently ignore
-    }
-  };
-
-  const formatTime = (dateStr) => {
-    const d = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now - d;
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return 'Just now';
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffH = Math.floor(diffMin / 60);
-    if (diffH < 24) return `${diffH}h ago`;
-    return d.toLocaleDateString();
-  };
-
-  // Strip the [L1]/[L2] marker for display
-  const cleanMessage = (msg) => msg.replace(/\[L\d\]\s*/, '');
-
-  const getLevel = (msg) => {
-    const match = msg.match(/\[L(\d)\]/);
-    return match ? parseInt(match[1]) : 0;
+    } catch { /* ignore */ }
   };
 
   return (
-    <Dropdown show={show} onToggle={(open) => setShow(open)} align="end">
-      <Dropdown.Toggle
-        as="div"
-        style={{ cursor: 'pointer', position: 'relative', padding: '4px 8px' }}
-        onClick={() => setShow(!show)}
+    <div ref={panelRef} style={{ position: 'relative' }}>
+      {/* Bell button */}
+      <button
+        className="tf-navbar-btn"
+        onClick={() => setOpen(!open)}
+        style={{ position: 'relative', padding: '0 10px' }}
+        title="Notifications"
       >
-        <Bell size={18} className="text-light" />
+        <Bell size={15} />
         {unreadCount > 0 && (
-          <Badge
-            bg="danger"
-            pill
-            className="position-absolute"
-            style={{
-              top: -2,
-              right: 0,
-              fontSize: '0.6rem',
-              minWidth: 16,
-              lineHeight: '14px',
-            }}
-          >
+          <span style={{
+            position: 'absolute', top: 3, right: 4,
+            background: '#ef4444', color: '#fff',
+            borderRadius: '50%', fontSize: 9, fontWeight: 700,
+            width: 15, height: 15,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            lineHeight: 1, border: '1.5px solid var(--tf-navbar)',
+          }}>
             {unreadCount > 9 ? '9+' : unreadCount}
-          </Badge>
+          </span>
         )}
-      </Dropdown.Toggle>
+      </button>
 
-      <Dropdown.Menu
-        className="bg-dark border-secondary shadow-lg p-0"
-        style={{ width: 360, maxHeight: 420, overflowY: 'auto' }}
-      >
-        {/* Header */}
-        <div
-          className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom border-secondary"
-          style={{ position: 'sticky', top: 0, backgroundColor: '#1e1e2e', zIndex: 1 }}
-        >
-          <span className="fw-semibold text-light small">Notifications</span>
-          {unreadCount > 0 && (
-            <span
-              className="text-primary small"
-              style={{ cursor: 'pointer', fontSize: '0.75rem' }}
-              onClick={handleMarkAllRead}
-            >
-              <CheckCheck size={12} className="me-1" />
-              Mark all read
+      {/* Dropdown panel */}
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: 42, zIndex: 300,
+          width: 340, maxHeight: 420,
+          background: 'var(--tf-col-bg)', border: '1px solid var(--tf-border)',
+          borderRadius: 10, boxShadow: 'var(--tf-shadow-lg)',
+          animation: 'dropDown 0.15s ease',
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '10px 14px',
+            borderBottom: '1px solid var(--tf-border)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            flexShrink: 0,
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--tf-text-strong)' }}>
+              Notifications
+              {unreadCount > 0 && (
+                <span style={{
+                  marginLeft: 8, fontSize: 10, fontWeight: 700,
+                  background: '#ef4444', color: '#fff',
+                  borderRadius: 20, padding: '1px 7px',
+                }}>
+                  {unreadCount}
+                </span>
+              )}
             </span>
-          )}
-        </div>
-
-        {/* Notification list */}
-        {notifications.length === 0 ? (
-          <div className="text-center text-secondary py-4 small">
-            <Bell size={24} className="mb-2 d-block mx-auto" style={{ opacity: 0.3 }} />
-            No notifications
-          </div>
-        ) : (
-          notifications.map((n) => {
-            const level = getLevel(n.message);
-            return (
-              <div
-                key={n._id}
-                className="px-3 py-2 border-bottom border-secondary d-flex align-items-start gap-2"
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllRead}
                 style={{
-                  cursor: 'pointer',
-                  backgroundColor: n.read ? 'transparent' : 'rgba(99, 102, 241, 0.06)',
-                  transition: 'background-color 0.15s',
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--tf-accent)', fontSize: 11.5, fontWeight: 500,
+                  display: 'flex', alignItems: 'center', gap: 4,
                 }}
-                onClick={() => !n.read && handleMarkRead(n._id)}
               >
-                {/* Level indicator */}
-                <div
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: '50%',
-                    backgroundColor: level === 2 ? '#ef4444' : level === 1 ? '#f59e0b' : '#6366f1',
-                    flexShrink: 0,
-                    marginTop: 6,
-                  }}
-                />
-                <div className="flex-grow-1">
+                <CheckCheck size={12} /> Mark all read
+              </button>
+            )}
+          </div>
+
+          {/* List */}
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {notifications.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--tf-text-muted)' }}>
+                <Bell size={28} style={{ opacity: 0.3, marginBottom: 8, display: 'block', margin: '0 auto 10px' }} />
+                <p style={{ fontSize: 13, margin: 0 }}>No notifications</p>
+              </div>
+            ) : (
+              notifications.map((n) => {
+                const level = getLevel(n.message);
+                return (
                   <div
-                    className="small"
+                    key={n._id}
+                    onClick={() => !n.read && handleMarkRead(n._id)}
                     style={{
-                      color: n.read ? '#888' : '#e0e0e0',
-                      fontSize: '0.8rem',
-                      lineHeight: 1.4,
+                      display: 'flex', gap: 10, alignItems: 'flex-start',
+                      padding: '10px 14px',
+                      borderBottom: '1px solid var(--tf-border-soft)',
+                      background: n.read ? 'transparent' : 'rgba(87,157,255,0.05)',
+                      cursor: n.read ? 'default' : 'pointer',
+                      transition: 'background 0.15s',
                     }}
                   >
-                    {cleanMessage(n.message)}
+                    {/* Level dot */}
+                    <div style={{
+                      width: 8, height: 8, borderRadius: '50%',
+                      background: LEVEL_COLORS[level] || LEVEL_COLORS[0],
+                      flexShrink: 0, marginTop: 4,
+                      boxShadow: `0 0 6px ${LEVEL_COLORS[level] || LEVEL_COLORS[0]}`,
+                    }} />
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontSize: 12.5, lineHeight: 1.45, margin: '0 0 3px',
+                        color: n.read ? 'var(--tf-text-muted)' : 'var(--tf-text-strong)',
+                      }}>
+                        {cleanMessage(n.message)}
+                      </p>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 10.5, color: 'var(--tf-text-muted)' }}>
+                          {formatTime(n.createdAt)}
+                        </span>
+                        {level === 2 && (
+                          <span style={{
+                            fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20,
+                            background: 'rgba(239,68,68,0.12)', color: '#fc8181',
+                          }}>ESCALATED</span>
+                        )}
+                        {level === 1 && (
+                          <span style={{
+                            fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20,
+                            background: 'rgba(245,205,71,0.12)', color: '#f5cd47',
+                          }}>OVERDUE</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {!n.read && (
+                      <div style={{
+                        width: 6, height: 6, borderRadius: '50%',
+                        background: 'var(--tf-accent)', flexShrink: 0, marginTop: 6,
+                      }} />
+                    )}
                   </div>
-                  <div className="d-flex align-items-center gap-2" style={{ fontSize: '0.65rem' }}>
-                    <span className="text-secondary">{formatTime(n.createdAt)}</span>
-                    {level === 2 && <Badge bg="danger" style={{ fontSize: '0.55rem' }}>Escalated</Badge>}
-                    {level === 1 && <Badge bg="warning" text="dark" style={{ fontSize: '0.55rem' }}>Overdue</Badge>}
-                  </div>
-                </div>
-                {!n.read && (
-                  <Check size={14} className="text-primary flex-shrink-0" style={{ marginTop: 4 }} />
-                )}
-              </div>
-            );
-          })
-        )}
-      </Dropdown.Menu>
-    </Dropdown>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
