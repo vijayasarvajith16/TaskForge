@@ -1,0 +1,5 @@
+# Vercel only builds client/ — ignore everything else
+node_modules
+*.log
+.env
+.env.*
