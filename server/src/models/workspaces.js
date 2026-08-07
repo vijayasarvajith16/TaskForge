@@ -11,6 +11,8 @@ async function createWorkspace({ name, ownerId, inviteCode }) {
     ownerId: new ObjectId(ownerId),
     memberIds: [new ObjectId(ownerId)],
     inviteCode,
+    webhookUrl: null,
+    webhookProvider: null,
     createdAt: new Date(),
   };
   const result = await col().insertOne(doc);
@@ -39,4 +41,18 @@ async function regenerateInviteCode(workspaceId, newCode) {
   );
 }
 
-module.exports = { createWorkspace, findWorkspaceById, findByInviteCode, addMember, regenerateInviteCode };
+async function updateWorkspaceWebhook(workspaceId, { webhookUrl, webhookProvider }) {
+  await col().updateOne(
+    { _id: new ObjectId(workspaceId) },
+    { $set: { webhookUrl: webhookUrl || null, webhookProvider: webhookProvider || null } }
+  );
+}
+
+module.exports = {
+  createWorkspace,
+  findWorkspaceById,
+  findByInviteCode,
+  addMember,
+  regenerateInviteCode,
+  updateWorkspaceWebhook,
+};

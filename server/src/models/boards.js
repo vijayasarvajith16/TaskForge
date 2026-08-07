@@ -22,6 +22,7 @@ async function createBoard({ name, workspaceId, eventDate = null, columns = null
     workspaceId: new ObjectId(workspaceId),
     eventDate: eventDate ? new Date(eventDate) : null,
     columns: columns || freshDefaultColumns(),
+    calendarToken: null,
     createdAt: new Date(),
   };
   const result = await col().insertOne(doc);
@@ -36,12 +37,32 @@ async function findBoardById(id) {
   return col().findOne({ _id: new ObjectId(id) });
 }
 
+async function findBoardByCalendarToken(token) {
+  if (!token) return null;
+  return col().findOne({ calendarToken: token });
+}
+
 async function updateColumns(boardId, columns) {
   await col().updateOne({ _id: new ObjectId(boardId) }, { $set: { columns } });
+}
+
+async function updateBoardCalendarToken(boardId, token) {
+  await col().updateOne(
+    { _id: new ObjectId(boardId) },
+    { $set: { calendarToken: token } }
+  );
 }
 
 async function deleteBoard(boardId) {
   await col().deleteOne({ _id: new ObjectId(boardId) });
 }
 
-module.exports = { createBoard, findByWorkspace, findBoardById, updateColumns, deleteBoard };
+module.exports = {
+  createBoard,
+  findByWorkspace,
+  findBoardById,
+  findBoardByCalendarToken,
+  updateColumns,
+  updateBoardCalendarToken,
+  deleteBoard,
+};

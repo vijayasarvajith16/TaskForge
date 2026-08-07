@@ -1,8 +1,6 @@
 const jwt = require('jsonwebtoken');
-const { findByBoard, findTaskById, updateTask } = require('../models/tasks');
-
-// In-memory map: userId (string) -> Set<socketId>
-const userSocketMap = new Map();
+const { findByBoard, updateTask } = require('../models/tasks');
+const { setUserSocket, removeUserSocket } = require('../redis');
 
 function initSockets(io) {
   // Authenticate socket connections via JWT
@@ -18,15 +16,12 @@ function initSockets(io) {
     }
   });
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     const userId = socket.userId;
     console.log(`Socket connected: ${socket.id} (user: ${userId})`);
 
-    // Track userId -> socketId mapping
-    if (!userSocketMap.has(userId)) {
-      userSocketMap.set(userId, new Set());
-    }
-    userSocketMap.get(userId).add(socket.id);
+    // Register in Redis-backed user→socket map
+    await setUserSocket(userId, socket.id);
 
     // ── join_board ─────────────────────────────────
     socket.on('join_board', ({ boardId }) => {
@@ -64,16 +59,12 @@ function initSockets(io) {
       socket.to(boardId).emit('task_deleted', { taskId });
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`Socket disconnected: ${socket.id}`);
-      // Clean up userId -> socketId mapping
-      const sockets = userSocketMap.get(userId);
-      if (sockets) {
-        sockets.delete(socket.id);
-        if (sockets.size === 0) userSocketMap.delete(userId);
-      }
+      // Clean up Redis user→socket mapping
+      await removeUserSocket(userId, socket.id);
     });
   });
 }
 
-module.exports = { initSockets, userSocketMap };
+module.exports = { initSockets };

@@ -1,42 +1,30 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { getTasks, createTask as apiCreateTask, updateTask as apiUpdateTask, moveTask as apiMoveTask, completeTask as apiCompleteTask, deleteTask as apiDeleteTask, getBoards } from '../api';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { getSocket, joinBoard } from '../socket';
+import { useBoardQuery } from '../hooks/useBoardQuery';
 
 const BoardContext = createContext(null);
 
-export function BoardProvider({ boardId, children }) {
-  const [board, setBoard] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+export function BoardProvider({ boardId, workspaceId, children }) {
   const [socketInstance, setSocketInstance] = useState(null);
-  const tasksRef = useRef(tasks);
+  const [error, setError] = useState('');
 
-  // Keep ref in sync for use in callbacks
+  const {
+    board,
+    tasks,
+    isLoading: loading,
+    error: queryError,
+    moveTask,
+    createTask,
+    updateTask,
+    completeTask,
+    deleteTask,
+    socketHandlers,
+  } = useBoardQuery({ boardId, workspaceId });
+
+  // Surface React Query errors through the same error state
   useEffect(() => {
-    tasksRef.current = tasks;
-  }, [tasks]);
-
-  // ── Load board and tasks from REST ──────────────
-  const loadData = useCallback(async (workspaceId) => {
-    try {
-      const boardsRes = await getBoards(workspaceId);
-      const found = boardsRes.data.find((b) => b._id.toString() === boardId);
-      if (!found) {
-        setError('Board not found');
-        setLoading(false);
-        return;
-      }
-      setBoard(found);
-
-      const tasksRes = await getTasks(boardId);
-      setTasks(tasksRes.data);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load board');
-    } finally {
-      setLoading(false);
-    }
-  }, [boardId]);
+    if (queryError) setError(queryError);
+  }, [queryError]);
 
   // ── Set up socket listeners ─────────────────────
   useEffect(() => {
@@ -46,55 +34,14 @@ export function BoardProvider({ boardId, children }) {
 
     joinBoard(boardId);
 
-    const handleTaskMoved = ({ taskId, columnId, order, task }) => {
-      setTasks((prev) => prev.map((t) => {
-        if (t._id.toString() === taskId) {
-          return task || { ...t, columnId, order };
-        }
-        return t;
-      }));
-    };
-
-    const handleTaskUpdated = ({ task }) => {
-      setTasks((prev) => prev.map((t) =>
-        t._id.toString() === task._id.toString() ? task : t
-      ));
-    };
-
-    const handleTaskCreated = ({ task }) => {
-      setTasks((prev) => {
-        const exists = prev.some((t) => t._id.toString() === task._id.toString());
-        if (exists) return prev;
-        return [...prev, task];
-      });
-    };
-
-    const handleTaskDeleted = ({ taskId }) => {
-      setTasks((prev) => prev.filter((t) => t._id.toString() !== taskId));
-    };
-
-    // Phase 3: tasks_unlocked — update status for newly unlocked tasks
-    const handleTasksUnlocked = ({ taskIds, tasks: unlockedTasks }) => {
-      console.log('Socket: tasks_unlocked received', taskIds);
-      if (unlockedTasks && unlockedTasks.length > 0) {
-        // Replace with full task data from server
-        setTasks((prev) => prev.map((t) => {
-          const updated = unlockedTasks.find((u) => u._id.toString() === t._id.toString());
-          return updated || t;
-        }));
-      } else {
-        // Fallback: just flip status from locked to open
-        setTasks((prev) => prev.map((t) =>
-          taskIds.includes(t._id.toString())
-            ? { ...t, status: 'open' }
-            : t
-        ));
-      }
-    };
-
+    const handleTaskMoved = (payload) => socketHandlers.onTaskMoved(payload);
+    const handleTaskUpdated = (payload) => socketHandlers.onTaskUpdated(payload);
+    const handleTaskCreated = (payload) => socketHandlers.onTaskCreated(payload);
+    const handleTaskDeleted = (payload) => socketHandlers.onTaskDeleted(payload);
+    const handleTasksUnlocked = (payload) => socketHandlers.onTasksUnlocked(payload);
     const handleConnect = () => {
       joinBoard(boardId);
-      getTasks(boardId).then((res) => setTasks(res.data)).catch(() => {});
+      socketHandlers.onReconnect();
     };
 
     socket.on('task_moved', handleTaskMoved);
@@ -114,87 +61,59 @@ export function BoardProvider({ boardId, children }) {
     };
   }, [boardId]);
 
-  // ── Task actions ────────────────────────────────
-
-  const handleMoveTask = useCallback(async (taskId, newColumnId, newOrder) => {
-    const snapshot = [...tasksRef.current];
-
-    setTasks((prev) => prev.map((t) =>
-      t._id.toString() === taskId
-        ? { ...t, columnId: newColumnId, order: newOrder }
-        : t
-    ));
-
+  // ── Wrappers that set local error on failure ────
+  const handleMoveTask = async (taskId, newColumnId, newOrder) => {
     try {
-      const res = await apiMoveTask(taskId, { columnId: newColumnId, order: newOrder });
-      setTasks((prev) => prev.map((t) =>
-        t._id.toString() === taskId ? res.data : t
-      ));
+      await moveTask(taskId, newColumnId, newOrder);
     } catch (err) {
-      setTasks(snapshot);
       setError(err.response?.data?.error || 'Failed to move task');
     }
-  }, []);
+  };
 
-  const handleCreateTask = useCallback(async (data) => {
+  const handleCreateTask = async (data) => {
     try {
-      const res = await apiCreateTask({ ...data, boardId });
-      setTasks((prev) => {
-        const exists = prev.some((t) => t._id.toString() === res.data._id.toString());
-        if (exists) return prev;
-        return [...prev, res.data];
-      });
-      return res.data;
+      return await createTask(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to create task');
       throw err;
     }
-  }, [boardId]);
+  };
 
-  const handleUpdateTask = useCallback(async (taskId, data) => {
+  const handleUpdateTask = async (taskId, data) => {
     try {
-      const res = await apiUpdateTask(taskId, data);
-      setTasks((prev) => prev.map((t) =>
-        t._id.toString() === taskId.toString() ? res.data : t
-      ));
-      return res.data;
+      return await updateTask(taskId, data);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update task');
       throw err;
     }
-  }, []);
+  };
 
-  // Phase 3: Complete a task and unlock dependents
-  const handleCompleteTask = useCallback(async (taskId) => {
+  const handleCompleteTask = async (taskId) => {
     try {
-      const res = await apiCompleteTask(taskId);
-      // Update the completed task
-      setTasks((prev) => prev.map((t) =>
-        t._id.toString() === res.data.task._id.toString() ? res.data.task : t
-      ));
-      // Also update any unlocked tasks (REST response has the IDs, socket has full data)
-      // The socket event will handle updating the unlocked tasks for this and all other clients
-      return res.data;
+      return await completeTask(taskId);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to complete task');
       throw err;
     }
-  }, []);
+  };
 
-  const handleDeleteTask = useCallback(async (taskId) => {
+  const handleDeleteTask = async (taskId) => {
     try {
-      await apiDeleteTask(taskId);
-      setTasks((prev) => prev.filter((t) => t._id.toString() !== taskId.toString()));
+      await deleteTask(taskId);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to delete task');
     }
-  }, []);
+  };
+
+  // loadData is kept for API compatibility but is now a no-op —
+  // React Query handles loading on mount automatically.
+  const loadData = () => {};
 
   return (
     <BoardContext.Provider
       value={{
         board, tasks, loading, error, setError, socket: socketInstance,
-        loadData, setBoard,
+        loadData, setBoard: () => {},
         moveTask: handleMoveTask,
         createTask: handleCreateTask,
         updateTask: handleUpdateTask,

@@ -6,6 +6,7 @@ const { computeStatus, findDirectDependents, validateDependencies } = require('.
 const { logActivity, findByTask: findActivityByTask } = require('../models/activityLogs');
 const { createComment, findByTask: findCommentsByTask } = require('../models/comments');
 const { findUserById } = require('../models/users');
+const { notifyWebhook } = require('../utils/webhook');
 
 const router = express.Router();
 
@@ -257,6 +258,20 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
       action: 'completed',
       detail: `${req.user.name} marked this as done`,
     });
+
+    // Fire-and-forget webhook notification
+    const workspaceId = board.workspaceId?.toString();
+    if (workspaceId) {
+      const assigneeName = completedTask.assignedTo
+        ? (await findUserById(completedTask.assignedTo.toString()).catch(() => null))?.name || 'Unknown'
+        : 'Unassigned';
+      notifyWebhook(
+        workspaceId,
+        `✅ Task *"${completedTask.title}"* completed by *${req.user.name}*` +
+          (assigneeName !== 'Unassigned' ? ` (assigned to ${assigneeName})` : ''),
+        { color: 'success' }
+      );
+    }
 
     const allTasks = await findByBoard(boardId);
     const dependents = findDirectDependents(req.params.id, allTasks);

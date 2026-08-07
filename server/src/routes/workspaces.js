@@ -2,9 +2,13 @@ const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { ObjectId } = require('mongodb');
 const { authenticate, authorize } = require('../middleware/auth');
-const { createWorkspace, findWorkspaceById, findByInviteCode, addMember, regenerateInviteCode } = require('../models/workspaces');
+const {
+  createWorkspace, findWorkspaceById, findByInviteCode,
+  addMember, regenerateInviteCode, updateWorkspaceWebhook,
+} = require('../models/workspaces');
 const { updateUser, findByWorkspace } = require('../models/users');
 const { getDb } = require('../db');
+const { notifyWebhook } = require('../utils/webhook');
 
 const router = express.Router();
 
@@ -93,16 +97,13 @@ router.get('/:id/workload', authenticate, async (req, res) => {
     const members = await findByWorkspace(workspace._id.toString());
     const db = getDb();
 
-    // Get all boards in this workspace
     const boards = await db.collection('boards').find({ workspaceId: new ObjectId(req.params.id) }).toArray();
     const boardIds = boards.map((b) => b._id);
 
-    // Get all tasks across those boards
     const tasks = boardIds.length > 0
       ? await db.collection('tasks').find({ boardId: { $in: boardIds } }).toArray()
       : [];
 
-    // Aggregate per member
     const workload = members.map((m) => {
       const memberTasks = tasks.filter((t) => t.assignedTo && t.assignedTo.toString() === m._id.toString());
       const openCount = memberTasks.filter((t) => t.status !== 'done' && t.status !== 'locked').length;
@@ -137,7 +138,6 @@ router.get('/:id/leaderboard', authenticate, async (req, res) => {
     const boards = await db.collection('boards').find({ workspaceId: new ObjectId(req.params.id) }).toArray();
     const boardIds = boards.map((b) => b._id);
 
-    // Optional date range filter
     const { from, to } = req.query;
     const taskFilter = { boardId: { $in: boardIds } };
     if (from || to) {
@@ -176,6 +176,90 @@ router.get('/:id/leaderboard', authenticate, async (req, res) => {
   } catch (err) {
     console.error('Leaderboard error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Webhook settings ─────────────────────────────────────────────────────────
+
+// PATCH /api/workspaces/:id/webhook — save webhook URL + provider (head/joint_head only)
+router.patch('/:id/webhook', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+  try {
+    const { webhookUrl, webhookProvider } = req.body;
+    if (!webhookUrl || !webhookProvider) {
+      return res.status(400).json({ error: 'webhookUrl and webhookProvider are required' });
+    }
+    if (!['slack', 'discord'].includes(webhookProvider)) {
+      return res.status(400).json({ error: 'webhookProvider must be "slack" or "discord"' });
+    }
+
+    const workspace = await findWorkspaceById(req.params.id);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+    if (workspace._id.toString() !== req.user.workspaceId?.toString()) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    await updateWorkspaceWebhook(req.params.id, { webhookUrl, webhookProvider });
+    res.json({ message: 'Webhook saved' });
+  } catch (err) {
+    console.error('Save webhook error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/workspaces/:id/webhook — remove webhook (head/joint_head only)
+router.delete('/:id/webhook', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+  try {
+    const workspace = await findWorkspaceById(req.params.id);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+    if (workspace._id.toString() !== req.user.workspaceId?.toString()) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    await updateWorkspaceWebhook(req.params.id, { webhookUrl: null, webhookProvider: null });
+    res.json({ message: 'Webhook removed' });
+  } catch (err) {
+    console.error('Delete webhook error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/workspaces/:id/webhook/test — send a test message (head/joint_head only)
+router.post('/:id/webhook/test', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+  try {
+    const workspace = await findWorkspaceById(req.params.id);
+    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
+    if (workspace._id.toString() !== req.user.workspaceId?.toString()) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    if (!workspace.webhookUrl) {
+      return res.status(400).json({ error: 'No webhook configured' });
+    }
+
+    // For the test, fire synchronously so we can report pass/fail to the UI
+    const { webhookUrl, webhookProvider } = workspace;
+    const payload = webhookProvider === 'slack'
+      ? { text: '✅ TaskForge webhook test — connection confirmed!' }
+      : {
+          content: '✅ TaskForge webhook test — connection confirmed!',
+          embeds: [{ description: '✅ TaskForge webhook test — connection confirmed!', color: 0x22c55e }],
+        };
+
+    const resp = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => '');
+      return res.status(502).json({ error: `Webhook returned HTTP ${resp.status}`, detail: body });
+    }
+
+    res.json({ message: 'Test message sent successfully' });
+  } catch (err) {
+    console.error('Test webhook error:', err);
+    res.status(502).json({ error: 'Failed to reach webhook URL', detail: err.message });
   }
 });
 

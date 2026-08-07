@@ -1,11 +1,16 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
+const { v4: uuidv4 } = require('uuid');
 const { authenticate, authorize } = require('../middleware/auth');
-const { createBoard, findByWorkspace, findBoardById, updateColumns, deleteBoard } = require('../models/boards');
+const {
+  createBoard, findByWorkspace, findBoardById, findBoardByCalendarToken,
+  updateColumns, updateBoardCalendarToken, deleteBoard,
+} = require('../models/boards');
 const { createTask, findByBoard, deleteByBoard } = require('../models/tasks');
 const { findTemplateById } = require('../models/templates');
 const { findByWorkspace: findUsersByWorkspace } = require('../models/users');
 const { computeStatus } = require('../utils/dependencies');
+const { createEvents } = require('ics');
 
 const router = express.Router();
 
@@ -61,27 +66,20 @@ router.post('/from-template', authenticate, authorize('head', 'joint_head'), asy
       return res.status(403).json({ error: 'Template does not belong to your workspace' });
     }
 
-    // 1. Create the board with eventDate
     const board = await createBoard({ name, workspaceId, eventDate });
     const boardId = board._id.toString();
-    const toDoColumnId = board.columns[0]._id.toString(); // First column = "To Do"
+    const toDoColumnId = board.columns[0]._id.toString();
 
-    // 2. Get workspace members for role auto-assignment
     const members = await findUsersByWorkspace(workspaceId);
-
-    // 3. Map blueprintId -> generated real task ID
     const blueprintToTaskId = new Map();
     const eventDateMs = new Date(eventDate).getTime();
     const msPerDay = 24 * 60 * 60 * 1000;
 
-    // First pass: create all tasks (without dependsOn initially)
     const createdTasks = [];
     for (let i = 0; i < template.taskBlueprint.length; i++) {
       const bp = template.taskBlueprint[i];
       const dueDate = new Date(eventDateMs + (bp.offsetDaysFromEvent || 0) * msPerDay);
 
-      // Auto-assign: match role to a workspace member's role
-      // The blueprint role is a free-form string like "head", "joint_head", "member"
       let assignedTo = null;
       if (bp.role) {
         const roleLower = bp.role.toLowerCase().replace(/\s+/g, '_');
@@ -96,14 +94,13 @@ router.post('/from-template', authenticate, authorize('head', 'joint_head'), asy
         description: '',
         assignedTo,
         dueDate: dueDate.toISOString(),
-        dependsOn: [], // Filled in second pass
+        dependsOn: [],
       });
 
       blueprintToTaskId.set(bp.blueprintId, task._id.toString());
       createdTasks.push({ task, blueprint: bp });
     }
 
-    // Second pass: set dependsOn using the real task IDs
     const { getDb } = require('../db');
     const tasksCol = getDb().collection('tasks');
 
@@ -123,7 +120,6 @@ router.post('/from-template', authenticate, authorize('head', 'joint_head'), asy
       }
     }
 
-    // 3. Run computeStatus on all tasks to set initial locked/open states
     const allTasks = await findByBoard(boardId);
     const bulkOps = [];
     for (const t of allTasks) {
@@ -141,9 +137,7 @@ router.post('/from-template', authenticate, authorize('head', 'joint_head'), asy
       await tasksCol.bulkWrite(bulkOps);
     }
 
-    // Fetch final state
     const finalTasks = await findByBoard(boardId);
-
     res.status(201).json({ board, tasks: finalTasks });
   } catch (err) {
     console.error('Create board from template error:', err);
@@ -183,6 +177,101 @@ router.delete('/:id', authenticate, authorize('head', 'joint_head'), async (req,
   } catch (err) {
     console.error('Delete board error:', err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── Calendar Feed ─────────────────────────────────────────────────────────────
+
+// POST /api/boards/:id/calendar/token — generate (or regenerate) a calendar token
+router.post('/:id/calendar/token', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+  try {
+    const board = await findBoardById(req.params.id);
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const token = uuidv4();
+    await updateBoardCalendarToken(req.params.id, token);
+    res.json({ calendarToken: token });
+  } catch (err) {
+    console.error('Generate calendar token error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/boards/:id/calendar/token — revoke calendar token
+router.delete('/:id/calendar/token', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+  try {
+    const board = await findBoardById(req.params.id);
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    await updateBoardCalendarToken(req.params.id, null);
+    res.json({ message: 'Calendar token revoked' });
+  } catch (err) {
+    console.error('Revoke calendar token error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/boards/:id/calendar.ics?token=... — unauthenticated .ics feed
+// token IS the auth — no JWT required (calendar apps can't send custom headers)
+router.get('/:id/calendar.ics', async (req, res) => {
+  try {
+    const { token, download } = req.query;
+    if (!token) return res.status(401).json({ error: 'token query param required' });
+
+    const board = await findBoardById(req.params.id);
+    if (!board || !board.calendarToken || board.calendarToken !== token) {
+      return res.status(401).send('Invalid or revoked calendar token');
+    }
+
+    // Fetch workspace members for assignee lookup
+    const { getDb } = require('../db');
+    const db = getDb();
+    const members = await db.collection('users')
+      .find({ workspaceId: board.workspaceId })
+      .project({ _id: 1, name: 1 })
+      .toArray();
+
+    const memberMap = new Map(members.map((m) => [m._id.toString(), m.name]));
+
+    // All non-done tasks with a due date
+    const tasks = await findByBoard(req.params.id);
+    const eligibleTasks = tasks.filter((t) => t.status !== 'done' && t.dueDate);
+
+    // Build ics events
+    const events = eligibleTasks.map((t) => {
+      const d = new Date(t.dueDate);
+      const assigneeName = t.assignedTo ? (memberMap.get(t.assignedTo.toString()) || 'Unassigned') : 'Unassigned';
+      return {
+        title: t.title,
+        description: `Assignee: ${assigneeName} | Status: ${t.status}${t.description ? '\n' + t.description : ''}`,
+        start: [d.getFullYear(), d.getMonth() + 1, d.getDate()],
+        end: [d.getFullYear(), d.getMonth() + 1, d.getDate()],
+        uid: t._id.toString() + '@taskforge',
+        status: t.status === 'in_progress' ? 'TENTATIVE' : 'CONFIRMED',
+      };
+    });
+
+    const { error: icsError, value: icsString } = createEvents(events);
+    if (icsError) {
+      console.error('ICS generation error:', icsError);
+      return res.status(500).send('Failed to generate calendar');
+    }
+
+    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store');
+    if (download === 'true') {
+      res.setHeader('Content-Disposition', `attachment; filename="${board.name.replace(/[^a-z0-9]/gi, '_')}.ics"`);
+    }
+    res.send(icsString);
+  } catch (err) {
+    console.error('Calendar feed error:', err);
+    res.status(500).send('Internal server error');
   }
 });
 

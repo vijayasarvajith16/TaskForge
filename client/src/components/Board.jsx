@@ -9,34 +9,168 @@ import DependencyGraph from './DependencyGraph';
 import NotificationBell from './NotificationBell';
 import TaskDetailDrawer from './TaskDetailDrawer';
 import PollsPanel from './PollsPanel';
-import { Button, Spinner, Alert, ButtonGroup } from 'react-bootstrap';
-import { ArrowLeft, Plus, LayoutGrid, GitBranch } from 'lucide-react';
+import { Button, Spinner, Alert, ButtonGroup, Modal } from 'react-bootstrap';
+import { ArrowLeft, Plus, LayoutGrid, GitBranch, CalendarDays, Copy, RefreshCw, Download, ExternalLink } from 'lucide-react';
+import { generateCalendarToken, revokeCalendarToken } from '../api';
 
+// ── CalendarModal ─────────────────────────────────────────────────────────────
+function CalendarModal({ show, onHide, board, boardId, onTokenChange }) {
+  const [calToken, setCalToken] = useState(board?.calendarToken || null);
+  const [generating, setGenerating] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setCalToken(board?.calendarToken || null);
+  }, [board]);
+
+  const feedUrl = calToken
+    ? `${window.location.origin}/api/boards/${boardId}/calendar.ics?token=${calToken}`
+    : null;
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const res = await generateCalendarToken(boardId);
+      setCalToken(res.data.calendarToken);
+      onTokenChange?.(res.data.calendarToken);
+    } catch (err) {
+      console.error('Generate token error', err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleRevoke = async () => {
+    setRevoking(true);
+    try {
+      await revokeCalendarToken(boardId);
+      setCalToken(null);
+      onTokenChange?.(null);
+    } catch (err) {
+      console.error('Revoke token error', err);
+    } finally {
+      setRevoking(false);
+    }
+  };
+
+  const handleCopy = () => {
+    if (!feedUrl) return;
+    navigator.clipboard.writeText(feedUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <Modal show={show} onHide={onHide} centered contentClassName="bg-dark text-light border-secondary">
+      <Modal.Header closeButton closeVariant="white" className="border-secondary">
+        <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2">
+          <CalendarDays size={18} className="text-primary" /> Calendar Export
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {calToken ? (
+          <>
+            <p className="small text-secondary mb-2">
+              Subscribe to this live feed in Google Calendar or Apple Calendar — it updates automatically as tasks change.
+            </p>
+
+            {/* Feed URL */}
+            <div
+              className="d-flex align-items-center gap-2 p-2 rounded mb-3"
+              style={{ backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              <code className="flex-grow-1 text-info" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>
+                {feedUrl}
+              </code>
+              <Button
+                variant={copied ? 'success' : 'outline-secondary'}
+                size="sm"
+                onClick={handleCopy}
+                title="Copy URL"
+                style={{ flexShrink: 0 }}
+              >
+                <Copy size={12} />
+              </Button>
+            </div>
+
+            {/* Instructions */}
+            <div className="mb-3 p-2 rounded" style={{ backgroundColor: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <p className="small mb-1 fw-semibold text-primary">How to subscribe:</p>
+              <ol className="small text-secondary mb-0 ps-3" style={{ lineHeight: 1.8 }}>
+                <li>Copy the URL above</li>
+                <li><strong className="text-light">Google Calendar</strong>: Other calendars → "From URL" → paste</li>
+                <li><strong className="text-light">Apple Calendar</strong>: File → New Calendar Subscription → paste</li>
+                <li><strong className="text-light">Outlook</strong>: Add calendar → From internet → paste</li>
+              </ol>
+            </div>
+
+            {/* Actions */}
+            <div className="d-flex gap-2 flex-wrap">
+              <a
+                href={`${feedUrl}&download=true`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-outline-secondary btn-sm"
+              >
+                <Download size={12} className="me-1" /> Download .ics
+              </a>
+              <a
+                href={`webcal://${feedUrl.replace(/^https?:\/\//, '')}`}
+                className="btn btn-outline-info btn-sm"
+              >
+                <ExternalLink size={12} className="me-1" /> Open in Calendar App
+              </a>
+              <Button
+                variant="outline-danger"
+                size="sm"
+                onClick={handleRevoke}
+                disabled={revoking}
+                className="ms-auto"
+                title="Revoke this URL and generate a new token"
+              >
+                {revoking ? <Spinner size="sm" className="me-1" /> : <RefreshCw size={12} className="me-1" />}
+                Revoke & Regenerate
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="text-center py-3">
+            <CalendarDays size={40} className="text-secondary mb-3" />
+            <p className="text-secondary small mb-3">
+              Generate a secure feed URL to subscribe to this board's tasks in any calendar app.
+            </p>
+            <Button variant="primary" onClick={handleGenerate} disabled={generating}>
+              {generating ? <><Spinner size="sm" className="me-1" />Generating…</> : 'Generate Calendar Feed'}
+            </Button>
+          </div>
+        )}
+      </Modal.Body>
+    </Modal>
+  );
+}
+
+// ── BoardInner ─────────────────────────────────────────────────────────────────
 function BoardInner() {
   const { boardId } = useParams();
   const { user, workspace } = useAuth();
   const navigate = useNavigate();
   const {
     board, tasks, loading, error, setError, socket,
-    loadData, moveTask, createTask, updateTask, completeTask, deleteTask,
+    moveTask, createTask, updateTask, completeTask, deleteTask,
   } = useBoard();
 
   const [viewMode, setViewMode] = useState('kanban');
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [defaultColumnId, setDefaultColumnId] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   // Task detail drawer
   const [drawerTaskId, setDrawerTaskId] = useState(null);
 
   const members = workspace?.members || [];
   const canEdit = user?.role === 'head' || user?.role === 'joint_head';
-
-  useEffect(() => {
-    if (user?.workspaceId) {
-      loadData(user.workspaceId);
-    }
-  }, [user, loadData]);
 
   const handleDragEnd = (result) => {
     const { draggableId, destination, source } = result;
@@ -100,6 +234,16 @@ function BoardInner() {
         </div>
         <div className="d-flex align-items-center gap-2">
           <NotificationBell token={localStorage.getItem('token')} />
+          {canEdit && (
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => setShowCalendar(true)}
+              title="Calendar Export"
+            >
+              <CalendarDays size={14} className="me-1" /> Calendar
+            </Button>
+          )}
           <ButtonGroup size="sm">
             <Button
               variant={viewMode === 'kanban' ? 'primary' : 'outline-secondary'}
@@ -193,14 +337,23 @@ function BoardInner() {
         socket={socket}
         boardId={boardId}
       />
+
+      {/* Calendar export modal */}
+      <CalendarModal
+        show={showCalendar}
+        onHide={() => setShowCalendar(false)}
+        board={board}
+        boardId={boardId}
+      />
     </div>
   );
 }
 
 export default function Board() {
   const { boardId } = useParams();
+  const { user } = useAuth();
   return (
-    <BoardProvider boardId={boardId}>
+    <BoardProvider boardId={boardId} workspaceId={user?.workspaceId}>
       <BoardInner />
     </BoardProvider>
   );

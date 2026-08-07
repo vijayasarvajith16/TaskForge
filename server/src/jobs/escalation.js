@@ -2,32 +2,32 @@ const cron = require('node-cron');
 const { getDb } = require('../db');
 const { createNotification, existsForTaskLevel } = require('../models/notifications');
 const { findByWorkspace: findUsersByWorkspace } = require('../models/users');
+const { getUserSocketIds } = require('../redis');
+const { notifyWebhook } = require('../utils/webhook');
 
 // Escalation thresholds — configurable via env for testing
 const ESCALATION_HOURS = parseInt(process.env.ESCALATION_HOURS || '24', 10);
 
-/**
- * Map of userId -> Set<socketId> for live notification push.
- * Managed by initSocketMap() in the socket layer.
- */
-let userSocketMap = new Map();
+/** Socket.io server reference — set once at startup. */
 let ioRef = null;
 
-function setSocketRefs(io, socketMap) {
+function setSocketRefs(io) {
   ioRef = io;
-  userSocketMap = socketMap;
 }
 
 /**
  * Send a notification to a user via Socket.io if they're connected.
+ * Uses the Redis-backed socket map so it works across multiple server instances.
  */
-function pushToUser(userId, notification) {
+async function pushToUser(userId, notification) {
   if (!ioRef) return;
-  const socketIds = userSocketMap.get(userId);
-  if (socketIds && socketIds.size > 0) {
+  try {
+    const socketIds = await getUserSocketIds(userId);
     for (const sid of socketIds) {
       ioRef.to(sid).emit('notification', notification);
     }
+  } catch (err) {
+    console.error('[Escalation] pushToUser error:', err.message);
   }
 }
 
@@ -38,7 +38,6 @@ async function runEscalation() {
   const db = getDb();
   const now = new Date();
 
-  // Find all overdue tasks that aren't done
   const overdueTasks = await db.collection('tasks').find({
     dueDate: { $lt: now },
     status: { $ne: 'done' },
@@ -52,9 +51,12 @@ async function runEscalation() {
   for (const task of overdueTasks) {
     const taskId = task._id.toString();
 
+    // Need the board to get workspaceId (used for both webhook and L2 member lookup)
+    const board = await db.collection('boards').findOne({ _id: task.boardId });
+    const workspaceId = board?.workspaceId?.toString();
+
     // ── Level 0 → 1: Notify the assignee ──
     if (task.escalationLevel === 0 && task.assignedTo) {
-      // Check for duplicate
       const existing = await existsForTaskLevel(taskId, 1);
       if (!existing) {
         const message = `[L1] Task "${task.title}" is overdue`;
@@ -63,11 +65,19 @@ async function runEscalation() {
           taskId,
           message,
         });
-        pushToUser(task.assignedTo.toString(), notif);
+        await pushToUser(task.assignedTo.toString(), notif);
+
+        // Fire-and-forget webhook
+        if (workspaceId) {
+          notifyWebhook(
+            workspaceId,
+            `⚠️ *[L1 Escalation]* Task *"${task.title}"* is overdue and has been escalated to the assignee.`,
+            { level: 1 }
+          );
+        }
         created++;
       }
 
-      // Bump escalation level
       await db.collection('tasks').updateOne(
         { _id: task._id },
         { $set: { escalationLevel: 1, updatedAt: now } }
@@ -79,17 +89,12 @@ async function runEscalation() {
       const hoursSinceOverdue = (now - new Date(task.dueDate)) / (1000 * 60 * 60);
 
       if (hoursSinceOverdue >= ESCALATION_HOURS) {
-        // Check for duplicate
         const existing = await existsForTaskLevel(taskId, 2);
         if (!existing) {
-          // Find the board to get workspaceId
-          const board = await db.collection('boards').findOne({ _id: task.boardId });
           if (board) {
-            // Find joint_head users in the workspace
             const members = await findUsersByWorkspace(board.workspaceId.toString());
             const jointHeads = members.filter((m) => m.role === 'joint_head' || m.role === 'head');
 
-            // Find assignee name for the message
             const assignee = members.find((m) => m._id.toString() === task.assignedTo?.toString());
             const assigneeName = assignee?.name || 'Unknown';
 
@@ -100,13 +105,21 @@ async function runEscalation() {
                 taskId,
                 message,
               });
-              pushToUser(jh._id.toString(), notif);
+              await pushToUser(jh._id.toString(), notif);
               created++;
+            }
+
+            // Fire-and-forget webhook
+            if (workspaceId) {
+              notifyWebhook(
+                workspaceId,
+                `🚨 *[L2 Escalation]* Task *"${task.title}"* assigned to *${assigneeName}* is overdue and unresolved — joint heads notified.`,
+                { level: 2 }
+              );
             }
           }
         }
 
-        // Bump escalation level
         await db.collection('tasks').updateOne(
           { _id: task._id },
           { $set: { escalationLevel: 2, updatedAt: now } }
@@ -122,7 +135,6 @@ async function runEscalation() {
 
 /**
  * Start the escalation cron job.
- * Default: every 30 minutes. If ESCALATION_CRON env is set, use that instead.
  */
 function startEscalationJob() {
   const cronExpr = process.env.ESCALATION_CRON || '*/30 * * * *';

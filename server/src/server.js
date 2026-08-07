@@ -4,7 +4,8 @@ const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const { connectDb } = require('./db');
-const { initSockets, userSocketMap } = require('./sockets');
+const { applyRedisAdapter } = require('./redis');
+const { initSockets } = require('./sockets');
 const { startEscalationJob, runEscalation, setSocketRefs } = require('./jobs/escalation');
 
 const authRoutes = require('./routes/auth');
@@ -60,10 +61,14 @@ const PORT = process.env.PORT || 3001;
 
 async function start() {
   await connectDb(process.env.MONGODB_URI);
+
+  // Wire Redis adapter before initSockets so all rooms use it
+  await applyRedisAdapter(io);
+
   initSockets(io);
 
-  // Wire escalation job with Socket.io refs for live push
-  setSocketRefs(io, userSocketMap);
+  // Wire escalation job with Socket.io for live push
+  setSocketRefs(io);
   startEscalationJob();
 
   server.listen(PORT, () => console.log(`TaskForge API + Socket.io listening on :${PORT}`));

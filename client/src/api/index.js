@@ -21,11 +21,20 @@ export const joinWorkspace = (code) => api.post(`/workspaces/join/${code}`);
 export const getWorkload = (id) => api.get(`/workspaces/${id}/workload`);
 export const getLeaderboard = (id, params) => api.get(`/workspaces/${id}/leaderboard`, { params });
 
+// Webhook settings
+export const saveWebhook = (id, data) => api.patch(`/workspaces/${id}/webhook`, data);
+export const testWebhook = (id) => api.post(`/workspaces/${id}/webhook/test`);
+export const deleteWebhook = (id) => api.delete(`/workspaces/${id}/webhook`);
+
 // ─── Boards ────────────────────────────────────────
 export const getBoards = (workspaceId) => api.get('/boards', { params: { workspaceId } });
 export const createBoard = (data) => api.post('/boards', data);
 export const createBoardFromTemplate = (data) => api.post('/boards/from-template', data);
 export const deleteBoard = (id) => api.delete(`/boards/${id}`);
+
+// Calendar feed
+export const generateCalendarToken = (id) => api.post(`/boards/${id}/calendar/token`);
+export const revokeCalendarToken = (id) => api.delete(`/boards/${id}/calendar/token`);
 
 // ─── Tasks ─────────────────────────────────────────
 export const getTasks = (boardId) => api.get('/tasks', { params: { boardId } });

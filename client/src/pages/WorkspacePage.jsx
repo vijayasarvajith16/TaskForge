@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { createWorkspace, joinWorkspace, generateInvite } from '../api';
+import { createWorkspace, joinWorkspace, generateInvite, saveWebhook, testWebhook, deleteWebhook } from '../api';
 import {
-  Container, Row, Col, Card, Form, Button, Alert, Badge, ListGroup,
+  Container, Row, Col, Card, Form, Button, Alert, Badge, ListGroup, Spinner,
 } from 'react-bootstrap';
-import { Users, Copy, RefreshCw, LogOut } from 'lucide-react';
+import { Users, Copy, RefreshCw, LogOut, Webhook, Send, Trash2, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function WorkspacePage() {
   const { user, workspace, logout, refreshWorkspace, updateLocalUser } = useAuth();
@@ -17,11 +17,28 @@ export default function WorkspacePage() {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Webhook settings state
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookProvider, setWebhookProvider] = useState('slack');
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookTesting, setWebhookTesting] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState(null); // { ok, message }
+
+  const canManage = user?.role === 'head' || user?.role === 'joint_head';
+
   useEffect(() => {
     if (user?.workspaceId && !workspace) {
       refreshWorkspace();
     }
   }, [user]);
+
+  // Pre-fill webhook fields from workspace data
+  useEffect(() => {
+    if (workspace?.webhookUrl) {
+      setWebhookUrl(workspace.webhookUrl);
+      setWebhookProvider(workspace.webhookProvider || 'slack');
+    }
+  }, [workspace]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -71,7 +88,50 @@ export default function WorkspacePage() {
     setTimeout(() => setSuccess(''), 2000);
   };
 
-  // ── If user has a workspace, show its details ──
+  // ── Webhook handlers ────────────────────────────────────────────────────────
+
+  const handleSaveWebhook = async (e) => {
+    e.preventDefault();
+    setWebhookSaving(true);
+    setWebhookStatus(null);
+    try {
+      await saveWebhook(workspace._id, { webhookUrl, webhookProvider });
+      await refreshWorkspace();
+      setWebhookStatus({ ok: true, message: 'Webhook saved.' });
+    } catch (err) {
+      setWebhookStatus({ ok: false, message: err.response?.data?.error || 'Failed to save webhook' });
+    } finally {
+      setWebhookSaving(false);
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    setWebhookTesting(true);
+    setWebhookStatus(null);
+    try {
+      await testWebhook(workspace._id);
+      setWebhookStatus({ ok: true, message: 'Test message sent — check your channel!' });
+    } catch (err) {
+      setWebhookStatus({ ok: false, message: err.response?.data?.error || 'Webhook test failed' });
+    } finally {
+      setWebhookTesting(false);
+    }
+  };
+
+  const handleDeleteWebhook = async () => {
+    setWebhookStatus(null);
+    try {
+      await deleteWebhook(workspace._id);
+      setWebhookUrl('');
+      setWebhookProvider('slack');
+      await refreshWorkspace();
+      setWebhookStatus({ ok: true, message: 'Webhook removed.' });
+    } catch (err) {
+      setWebhookStatus({ ok: false, message: err.response?.data?.error || 'Failed to remove webhook' });
+    }
+  };
+
+  // ── If user has a workspace, show its details ────────────────────────────────
   if (workspace) {
     return (
       <div className="min-vh-100 bg-dark text-light">
@@ -95,6 +155,7 @@ export default function WorkspacePage() {
           {success && <Alert variant="success" className="py-2 small" dismissible onClose={() => setSuccess('')}>{success}</Alert>}
           {error && <Alert variant="danger" className="py-2 small" dismissible onClose={() => setError('')}>{error}</Alert>}
 
+          {/* ── Workspace card ─────────────────────────────── */}
           <Card className="bg-dark border-secondary mb-4">
             <Card.Body>
               <h4 className="fw-bold mb-1">
@@ -113,7 +174,7 @@ export default function WorkspacePage() {
                 <Button variant="outline-info" size="sm" onClick={copyCode} title="Copy">
                   <Copy size={14} />
                 </Button>
-                {(user.role === 'head' || user.role === 'joint_head') && (
+                {canManage && (
                   <Button variant="outline-warning" size="sm" onClick={handleRegenInvite} title="Regenerate">
                     <RefreshCw size={14} />
                   </Button>
@@ -136,6 +197,103 @@ export default function WorkspacePage() {
               </ListGroup>
             </Card.Body>
           </Card>
+
+          {/* ── Integrations card (admin only) ─────────────── */}
+          {canManage && (
+            <Card className="bg-dark border-secondary mb-4">
+              <Card.Body>
+                <h5 className="fw-bold mb-1 d-flex align-items-center gap-2">
+                  <Webhook size={18} className="text-primary" />
+                  Integrations
+                </h5>
+                <p className="text-secondary small mb-3">
+                  Post escalation alerts and task completions to a Slack or Discord channel.
+                </p>
+
+                {/* Status feedback */}
+                {webhookStatus && (
+                  <Alert
+                    variant={webhookStatus.ok ? 'success' : 'danger'}
+                    className="py-2 small d-flex align-items-center gap-2"
+                    dismissible
+                    onClose={() => setWebhookStatus(null)}
+                  >
+                    {webhookStatus.ok
+                      ? <CheckCircle2 size={14} className="flex-shrink-0" />
+                      : <XCircle size={14} className="flex-shrink-0" />
+                    }
+                    {webhookStatus.message}
+                  </Alert>
+                )}
+
+                <Form onSubmit={handleSaveWebhook}>
+                  <Row className="g-2 mb-2">
+                    <Col xs={4}>
+                      <Form.Select
+                        size="sm"
+                        value={webhookProvider}
+                        onChange={(e) => setWebhookProvider(e.target.value)}
+                        className="bg-dark text-light border-secondary"
+                      >
+                        <option value="slack">Slack</option>
+                        <option value="discord">Discord</option>
+                      </Form.Select>
+                    </Col>
+                    <Col xs={8}>
+                      <Form.Control
+                        size="sm"
+                        type="url"
+                        placeholder={
+                          webhookProvider === 'slack'
+                            ? 'https://hooks.slack.com/services/…'
+                            : 'https://discord.com/api/webhooks/…'
+                        }
+                        value={webhookUrl}
+                        onChange={(e) => setWebhookUrl(e.target.value)}
+                        className="bg-dark text-light border-secondary"
+                        required
+                      />
+                    </Col>
+                  </Row>
+                  <div className="d-flex gap-2 flex-wrap">
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="sm"
+                      disabled={webhookSaving || !webhookUrl}
+                    >
+                      {webhookSaving ? <><Spinner size="sm" className="me-1" />Saving…</> : 'Save'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline-info"
+                      size="sm"
+                      onClick={handleTestWebhook}
+                      disabled={webhookTesting || !workspace?.webhookUrl}
+                      title={!workspace?.webhookUrl ? 'Save a webhook URL first' : 'Send a test message'}
+                    >
+                      {webhookTesting ? <><Spinner size="sm" className="me-1" />Testing…</> : <><Send size={12} className="me-1" />Test</>}
+                    </Button>
+                    {workspace?.webhookUrl && (
+                      <Button
+                        type="button"
+                        variant="outline-danger"
+                        size="sm"
+                        onClick={handleDeleteWebhook}
+                      >
+                        <Trash2 size={12} className="me-1" />Remove
+                      </Button>
+                    )}
+                  </div>
+                  {workspace?.webhookUrl && (
+                    <p className="text-success small mt-2 mb-0" style={{ fontSize: '0.75rem' }}>
+                      ✓ Webhook active ({workspace.webhookProvider})
+                    </p>
+                  )}
+                </Form>
+              </Card.Body>
+            </Card>
+          )}
         </Container>
       </div>
     );
