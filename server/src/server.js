@@ -19,15 +19,26 @@ const pollRoutes = require('./routes/polls');
 const app = express();
 const server = http.createServer(app);
 
-// Socket.io with CORS for Vite dev server
+// Allowed origins — add your Vercel URL via CLIENT_URL env var
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+];
+
+// Socket.io with CORS
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
 app.use(express.json());
 
 // Attach io to app so routes can access it for broadcasting

@@ -28,7 +28,7 @@ export function getSocket() {
     socket.disconnect();
   }
 
-  socket = io('http://localhost:3001', {
+  socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001', {
     auth: { token },
     transports: ['websocket', 'polling'],
     reconnection: true,

@@ -41,7 +41,7 @@ export default function NotificationBell({ token }) {
 
   useEffect(() => {
     if (!token) return;
-    const socket = io('http://localhost:3001', { auth: { token }, transports: ['websocket'] });
+    const socket = io(import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001', { auth: { token }, transports: ['websocket'] });
     socket.on('notification', (notif) => {
       setNotifications((p) => [notif, ...p]);
       setUnreadCount((p) => p + 1);
