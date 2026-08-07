@@ -132,13 +132,7 @@ export default function WorkspacePage() {
         {/* Navbar */}
         <div className="tf-navbar">
           <a className="tf-navbar-brand" style={{ cursor: 'default' }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: 6,
-              background: 'linear-gradient(135deg,var(--tf-accent) 0%,#ae4cfc 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Zap size={15} color="#fff" />
-            </div>
+            <img src="/logo.png" alt="TaskForge" style={{ width: 26, height: 26, borderRadius: 6 }} />
             <span><span className="tf-brand-blue">Task</span>Forge</span>
           </a>
           <div style={{ flex: 1 }} />
@@ -333,13 +327,7 @@ export default function WorkspacePage() {
       <div style={{ width: '100%', maxWidth: 720 }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <div style={{
-              width: 40, height: 40, borderRadius: 10,
-              background: 'linear-gradient(135deg,var(--tf-accent) 0%,#ae4cfc 100%)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Zap size={22} color="#fff" />
-            </div>
+            <img src="/logo.png" alt="TaskForge" style={{ width: 40, height: 40, borderRadius: 10 }} />
             <span style={{ fontSize: 26, fontWeight: 800, color: 'var(--tf-text-strong)', letterSpacing: '-0.5px' }}>
               <span style={{ color: 'var(--tf-accent)' }}>Task</span>Forge
             </span>

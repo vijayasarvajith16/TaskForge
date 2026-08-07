@@ -178,7 +178,7 @@ function BoardInner() {
       <div className="tf-navbar">
         {/* Logo */}
         <a onClick={() => navigate('/boards')} className="tf-navbar-brand" style={{ cursor: 'pointer', textDecoration: 'none' }}>
-          <img src="/logo.png" alt="" className="brand-logo" />
+          <img src="/logo.png" alt="TaskForge" style={{ width: 26, height: 26, borderRadius: 6 }} />
           <span><span className="tf-brand-blue">Task</span>Forge</span>
         </a>
 

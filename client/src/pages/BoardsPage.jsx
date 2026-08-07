@@ -135,13 +135,7 @@ export default function BoardsPage() {
       {/* ── Trello-style top navbar ── */}
       <div className="tf-navbar">
         <a className="tf-navbar-brand" style={{ cursor: 'default' }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 6,
-            background: 'linear-gradient(135deg,var(--tf-accent) 0%,#ae4cfc 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Zap size={15} color="#fff" />
-          </div>
+          <img src="/logo.png" alt="TaskForge" style={{ width: 26, height: 26, borderRadius: 6 }} />
           <span><span className="tf-brand-blue">Task</span>Forge</span>
         </a>
 
