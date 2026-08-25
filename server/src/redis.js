@@ -19,7 +19,7 @@ function getRedisClients() {
     lazyConnect: false,
     maxRetriesPerRequest: null,   // required by the adapter — don't cap this
   });
-  subClient = pubClient.duplicate();
+  subClient = pubClient.duplicate(); 
 
   pubClient.on('error', (err) => console.error('[Redis pub] error:', err.message));
   subClient.on('error', (err) => console.error('[Redis sub] error:', err.message));
