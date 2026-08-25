@@ -41,15 +41,22 @@ async function applyRedisAdapter(io) {
     return;
   }
 
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Redis ping timed out after 5s')), 5000)
+  );
+
   try {
-    await Promise.all([
-      clients.pubClient.ping(),
-      clients.subClient.ping(),
+    await Promise.race([
+      Promise.all([clients.pubClient.ping(), clients.subClient.ping()]),
+      timeout,
     ]);
     io.adapter(createAdapter(clients.pubClient, clients.subClient));
     console.log('[Redis] Adapter connected —', REDIS_URL.replace(/:\/\/.*@/, '://***@'));
   } catch (err) {
     console.error('[Redis] Failed to connect adapter, falling back to in-memory:', err.message);
+    // Destroy stuck clients so they don't keep retrying in the background
+    try { clients.pubClient.disconnect(); } catch (_) {}
+    try { clients.subClient.disconnect(); } catch (_) {}
   }
 }
 
