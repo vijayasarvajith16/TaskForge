@@ -15,7 +15,10 @@ function getRedisClients() {
   if (!REDIS_URL) return null;
   if (pubClient) return { pubClient, subClient };
 
-  pubClient = new Redis(REDIS_URL, { lazyConnect: false, maxRetriesPerRequest: 3 });
+  pubClient = new Redis(REDIS_URL, {
+    lazyConnect: false,
+    maxRetriesPerRequest: null,   // required by the adapter — don't cap this
+  });
   subClient = pubClient.duplicate();
 
   pubClient.on('error', (err) => console.error('[Redis pub] error:', err.message));
