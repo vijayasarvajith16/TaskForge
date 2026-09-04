@@ -20,7 +20,10 @@ function initSockets(io) {
     const userId = socket.userId;
     console.log(`Socket connected: ${socket.id} (user: ${userId})`);
 
-    // Register in Redis-backed user→socket map
+    // Join personal user room for direct notification delivery (single-instance & fallback mode)
+    socket.join(`user:${userId}`);
+
+    // Register in Redis-backed user→socket map (if Redis is active)
     await setUserSocket(userId, socket.id);
 
     // ── join_board ─────────────────────────────────

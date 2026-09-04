@@ -23,8 +23,13 @@ async function pushToUser(userId, notification) {
   if (!ioRef) return;
   try {
     const socketIds = await getUserSocketIds(userId);
-    for (const sid of socketIds) {
-      ioRef.to(sid).emit('notification', notification);
+    if (socketIds && socketIds.length > 0) {
+      for (const sid of socketIds) {
+        ioRef.to(sid).emit('notification', notification);
+      }
+    } else {
+      // Fallback to room-based emit for single-instance / in-memory mode
+      ioRef.to(`user:${userId}`).emit('notification', notification);
     }
   } catch (err) {
     console.error('[Escalation] pushToUser error:', err.message);
