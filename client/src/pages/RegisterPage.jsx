@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Alert } from 'react-bootstrap';
+import { Alert, Spinner } from 'react-bootstrap';
 import ThemeToggle from '../components/ThemeToggle';
 
 export default function RegisterPage() {
@@ -22,7 +22,7 @@ export default function RegisterPage() {
       await registerUser(name, email, password, role);
       navigate('/workspace');
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
+      setError(err.response?.data?.error || 'Registration failed. Please check input parameters.');
     } finally {
       setLoading(false);
     }
@@ -32,17 +32,18 @@ export default function RegisterPage() {
     <div className="tf-auth-wrapper">
       <div className="tf-auth-card">
         {/* Header with Logo and ThemeToggle */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div className="tf-auth-logo" style={{ margin: 0 }}>
-            <img src="/logo.png" alt="TaskForge" style={{ width: 40, height: 40, borderRadius: '30%' }} />
+            <img src="/logo.png" alt="TaskForge" style={{ width: 36, height: 36, borderRadius: '30%' }} />
             <span><span style={{ color: 'var(--tf-accent)' }}>Task</span>Forge</span>
           </div>
           <div className="tf-nav-group">
             <ThemeToggle />
           </div>
         </div>
-        <h2 style={{ fontSize: 28, fontWeight: 650, marginBottom: 4, letterSpacing: '-0.3px' }}>Create account.</h2>
-        <p className="tf-auth-subtitle">Join your team workspace today.</p>
+
+        <h2 style={{ fontSize: 26, fontWeight: 650, marginBottom: 4 }}>Create account.</h2>
+        <p className="tf-auth-subtitle">Provision your engineer identity in TaskForge.</p>
 
         {error && (
           <Alert variant="danger" className="py-2.5 px-3 mb-4">
@@ -59,20 +60,22 @@ export default function RegisterPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              placeholder="Jane Smith"
+              placeholder="e.g. Alex Rivera"
             />
           </div>
+
           <div style={{ marginBottom: 14 }}>
-            <label className="form-label">Email address</label>
+            <label className="form-label">Corporate Email</label>
             <input
               type="email"
               className="form-control"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="you@example.com"
+              placeholder="name@company.com"
             />
           </div>
+
           <div style={{ marginBottom: 14 }}>
             <label className="form-label">Password</label>
             <input
@@ -82,32 +85,34 @@ export default function RegisterPage() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              placeholder="Min 6 characters"
+              placeholder="Minimum 6 characters"
             />
           </div>
+
           <div style={{ marginBottom: 24 }}>
-            <label className="form-label">Role</label>
+            <label className="form-label">Initial Role Profile</label>
             <select
               className="form-select"
               value={role}
               onChange={(e) => setRole(e.target.value)}
             >
-              <option value="member">Member</option>
-              <option value="head">Head</option>
-              <option value="joint_head">Joint Head</option>
+              <option value="member">Member (Engineer / Contributor)</option>
+              <option value="head">Head (Engineering Director / Admin)</option>
+              <option value="joint_head">Joint Head (Tech Lead / Scrum Master)</option>
             </select>
           </div>
+
           <button
             type="submit"
-            className="btn btn-primary"
-            style={{ width: '100%', height: 44, fontSize: 15, fontWeight: 600 }}
+            className="btn button-primary"
+            style={{ width: '100%', height: 42, fontSize: 14 }}
             disabled={loading}
           >
-            {loading ? 'Creating account…' : 'Create account'}
+            {loading ? <Spinner size="sm" /> : 'Create account'}
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', fontSize: 13.5, color: 'var(--tf-text-muted)', marginTop: 24, marginBottom: 0 }}>
+        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--tf-text-muted)', marginTop: 24, marginBottom: 0 }}>
           Already have an account?{' '}
           <Link to="/login" style={{ color: 'var(--tf-ink)', textDecoration: 'underline', fontWeight: 600 }}>
             Sign in

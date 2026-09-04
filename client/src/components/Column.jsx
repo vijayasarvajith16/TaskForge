@@ -2,32 +2,23 @@ import { Droppable, Draggable } from '@hello-pangea/dnd';
 import TaskCard from './TaskCard';
 import { Plus } from 'lucide-react';
 
-// Map column names → accent colours from CSS design tokens
-const COLUMN_COLORS = {
+const COLUMN_DOT_COLORS = {
   'To Do':       'var(--col-todo)',
   'In Progress': 'var(--col-inprogress)',
   'Blocked':     'var(--col-blocked)',
   'Done':        'var(--col-done)',
 };
 
-const COLUMN_GRADIENTS = {
-  'To Do':       'linear-gradient(135deg,rgba(87,157,255,0.15),rgba(87,157,255,0.04))',
-  'In Progress': 'linear-gradient(135deg,rgba(96,198,210,0.15),rgba(96,198,210,0.04))',
-  'Blocked':     'linear-gradient(135deg,rgba(245,205,71,0.15),rgba(245,205,71,0.04))',
-  'Done':        'linear-gradient(135deg,rgba(75,206,151,0.15),rgba(75,206,151,0.04))',
-};
-
 export default function Column({
   column, tasks, members, allTasks = [],
   onAddTask, onEditTask, onDeleteTask, onCompleteTask, canEdit, onTaskClick,
 }) {
-  const accent = COLUMN_COLORS[column.name] || 'var(--col-todo)';
-  const gradient = COLUMN_GRADIENTS[column.name] || COLUMN_GRADIENTS['To Do'];
+  const accent = COLUMN_DOT_COLORS[column.name] || 'var(--tf-ink)';
   const droppableId = column._id.toString();
 
   return (
     <div className="tf-column">
-      {/* ── Column header ── */}
+      {/* ── Column Header ── */}
       <div className="tf-column-header">
         <div
           className="tf-column-dot"
@@ -39,15 +30,15 @@ export default function Column({
           <button
             className="tf-icon-btn"
             onClick={onAddTask}
-            title="Add a card"
-            style={{ marginLeft: 2 }}
+            title="Create issue in column"
+            style={{ marginLeft: 'auto' }}
           >
-            <Plus size={14} />
+            <Plus size={13} />
           </button>
         )}
       </div>
 
-      {/* ── Droppable body ── */}
+      {/* ── Droppable Body ── */}
       <Droppable droppableId={droppableId}>
         {(provided, snapshot) => (
           <div
@@ -55,7 +46,6 @@ export default function Column({
             {...provided.droppableProps}
             className={`tf-column-body ${snapshot.isDraggingOver ? 'dragging-over' : ''}`}
             style={{
-              background: snapshot.isDraggingOver ? gradient : 'transparent',
               minHeight: 60,
             }}
           >
@@ -91,27 +81,26 @@ export default function Column({
             {provided.placeholder}
 
             {tasks.length === 0 && !snapshot.isDraggingOver && (
-              <p
+              <div
                 style={{
                   fontSize: 12,
-                  color: 'var(--tf-text-muted)',
+                  color: 'var(--tf-text-faint)',
                   textAlign: 'center',
-                  marginTop: 16,
-                  opacity: 0.6,
+                  padding: '24px 0',
                   userSelect: 'none',
                 }}
               >
-                No cards
-              </p>
+                No active issues
+              </div>
             )}
           </div>
         )}
       </Droppable>
 
-      {/* ── Add card button at bottom ── */}
+      {/* ── Add Issue Button ── */}
       {canEdit && (
         <button className="tf-add-card-btn" onClick={onAddTask}>
-          <Plus size={14} /> Add a card
+          <Plus size={13} /> Add issue
         </button>
       )}
     </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Card, Badge, Button, Form, ProgressBar, Alert } from 'react-bootstrap';
-import { BarChart3, Plus, X, Vote } from 'lucide-react';
+import { Alert } from 'react-bootstrap';
+import { BarChart3, Plus, X, Vote, Check } from 'lucide-react';
 import { getPolls, createPoll, votePoll } from '../api';
 
 export default function PollsPanel({ boardId, userId, canManage, socket }) {
@@ -62,97 +62,167 @@ export default function PollsPanel({ boardId, userId, canManage, socket }) {
   if (polls.length === 0 && !canManage) return null;
 
   return (
-    <div className="mb-3 px-4">
-      <div className="d-flex justify-content-between align-items-center mb-2">
-        <span className="form-label mb-0" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <BarChart3 size={15} style={{ color: 'var(--tf-accent)' }} /> Active Polls
+    <div style={{ padding: '0 32px 14px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span className="tf-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, margin: 0 }}>
+          <BarChart3 size={13} style={{ color: 'var(--tf-accent)' }} /> Team Consensus & Polls
         </span>
         {canManage && (
-          <button className="tf-navbar-btn active" style={{ height: 30, padding: '0 12px', fontSize: 12 }} onClick={() => setShowCreate(!showCreate)}>
-            <Plus size={13} /> New Poll
+          <button
+            className="tf-navbar-btn"
+            style={{ height: 28, padding: '0 10px', fontSize: 12, border: '1px solid var(--tf-hairline)' }}
+            onClick={() => setShowCreate(!showCreate)}
+          >
+            <Plus size={12} /> New Poll
           </button>
         )}
       </div>
 
       {showCreate && (
-        <Card style={{ background: 'var(--tf-canvas)', border: '1px solid var(--tf-hairline)', borderRadius: 16 }} className="mb-3">
-          <Card.Body className="p-3">
-            {error && <Alert variant="danger" className="py-2 small mb-2">{error}</Alert>}
-            <Form onSubmit={handleCreate}>
-              <Form.Control
-                size="sm" className="mb-2"
-                placeholder="Poll question" value={question} onChange={(e) => setQuestion(e.target.value)}
+        <div style={{
+          background: 'var(--tf-canvas)',
+          border: '1px solid var(--tf-hairline)',
+          borderRadius: 'var(--tf-radius-md)',
+          padding: '18px 20px',
+          marginBottom: 14,
+          animation: 'modalUp 0.15s ease',
+        }}>
+          {error && <Alert variant="danger" className="py-2 small mb-3">{error}</Alert>}
+          <form onSubmit={handleCreate}>
+            <div style={{ marginBottom: 10 }}>
+              <label className="form-label">Poll Question</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="e.g. Should we adopt GraphQL for public API v2?"
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+                required
               />
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+              <label className="form-label">Options</label>
               {options.map((opt, i) => (
-                <div key={i} className="d-flex gap-2 mb-2">
-                  <Form.Control
-                    size="sm"
-                    placeholder={`Option ${i + 1}`} value={opt}
+                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder={`Option ${i + 1}`}
+                    value={opt}
                     onChange={(e) => { const n = [...options]; n[i] = e.target.value; setOptions(n); }}
+                    required
                   />
                   {options.length > 2 && (
-                    <Button variant="link" size="sm" className="p-0 text-danger" onClick={() => setOptions(options.filter((_, j) => j !== i))}>
-                      <X size={14} />
-                    </Button>
+                    <button
+                      type="button"
+                      className="tf-icon-btn delete"
+                      onClick={() => setOptions(options.filter((_, j) => j !== i))}
+                    >
+                      <X size={13} />
+                    </button>
                   )}
                 </div>
               ))}
-              <Button variant="link" size="sm" className="p-0 text-primary mb-3" style={{ fontSize: '0.8rem', fontWeight: 600 }}
-                onClick={() => setOptions([...options, ''])}>+ Add option</Button>
-              <Form.Control size="sm" type="datetime-local" className="mb-3"
-                value={closesAt} onChange={(e) => setClosesAt(e.target.value)} />
-              <div className="d-flex gap-2 justify-content-end">
-                <Button variant="outline-secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
-                <Button variant="primary" size="sm" type="submit">Create Poll</Button>
-              </div>
-            </Form>
-          </Card.Body>
-        </Card>
+              <button
+                type="button"
+                className="btn button-outline"
+                style={{ height: 28, padding: '0 12px', fontSize: 12, marginTop: 4 }}
+                onClick={() => setOptions([...options, ''])}
+              >
+                + Add option
+              </button>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label className="form-label">Closes At</label>
+              <input
+                type="datetime-local"
+                className="form-control"
+                value={closesAt}
+                onChange={(e) => setClosesAt(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 10, borderTop: '1px solid var(--tf-hairline-soft)' }}>
+              <button type="button" className="btn button-outline" style={{ height: 32 }} onClick={() => setShowCreate(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn button-primary" style={{ height: 32 }}>
+                Publish Poll
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
-      {polls.map((poll) => {
-        const isClosed = new Date(poll.closesAt) < now;
-        const totalVotes = poll.options.reduce((s, o) => s + (o.votes?.length || 0), 0);
-        const userVotedIndex = poll.options.findIndex((o) => o.votes?.some((v) => v.toString() === userId));
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 12 }}>
+        {polls.map((poll) => {
+          const isClosed = new Date(poll.closesAt) < now;
+          const totalVotes = poll.options.reduce((s, o) => s + (o.votes?.length || 0), 0);
+          const userVotedIndex = poll.options.findIndex((o) => o.votes?.some((v) => v.toString() === userId));
 
-        return (
-          <Card key={poll._id.toString()} style={{ background: 'var(--tf-canvas-soft)', border: '1px solid var(--tf-hairline-soft)', borderRadius: 16 }} className="mb-2">
-            <Card.Body className="p-3">
-              <div className="d-flex justify-content-between align-items-start mb-2">
-                <span style={{ fontSize: 14, fontWeight: 650, color: 'var(--tf-ink)' }}>{poll.question}</span>
+          return (
+            <div
+              key={poll._id.toString()}
+              style={{
+                background: 'var(--tf-canvas)',
+                border: '1px solid var(--tf-hairline)',
+                borderRadius: 'var(--tf-radius-sm)',
+                padding: '14px 16px',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <span style={{ fontSize: 13.5, fontWeight: 650, color: 'var(--tf-ink)' }}>{poll.question}</span>
                 {isClosed ? (
                   <span className="tf-chip" style={{ fontSize: 10 }}>Closed</span>
                 ) : (
                   <span className="tf-badge-popular" style={{ fontSize: 10 }}>Active</span>
                 )}
               </div>
+
               {poll.options.map((opt, i) => {
                 const count = opt.votes?.length || 0;
                 const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
                 const isMyVote = i === userVotedIndex;
+
                 return (
-                  <div key={i} className="mb-2" style={{ cursor: isClosed ? 'default' : 'pointer' }}
-                    onClick={() => !isClosed && handleVote(poll._id.toString(), i)}>
-                    <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: '0.82rem' }}>
-                      <span style={{ fontWeight: isMyVote ? 650 : 500, color: 'var(--tf-ink)' }}>
-                        {isMyVote && <Vote size={12} className="me-1" style={{ color: 'var(--tf-accent)' }} />}{opt.text}
+                  <div
+                    key={i}
+                    style={{ marginBottom: 10, cursor: isClosed ? 'default' : 'pointer' }}
+                    onClick={() => !isClosed && handleVote(poll._id.toString(), i)}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, fontSize: '12.5px' }}>
+                      <span style={{ fontWeight: isMyVote ? 650 : 500, color: 'var(--tf-ink)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {isMyVote && <Check size={12} style={{ color: 'var(--tf-accent)' }} />}
+                        {opt.text}
                       </span>
-                      <span style={{ fontSize: 11, color: 'var(--tf-text-muted)' }}>{count} ({pct}%)</span>
+                      <span className="tf-mono" style={{ fontSize: 11, color: 'var(--tf-text-muted)' }}>
+                        {count} ({pct}%)
+                      </span>
                     </div>
-                    <ProgressBar
-                      now={pct} variant={isMyVote ? 'primary' : 'secondary'}
-                      style={{ height: 6, borderRadius: 9999, backgroundColor: 'var(--tf-hairline)' }}
-                    />
+
+                    <div className="tf-progress-track">
+                      <div
+                        className="tf-progress-fill"
+                        style={{
+                          width: `${pct}%`,
+                          background: isMyVote ? 'var(--tf-accent)' : 'var(--tf-ink-soft)',
+                        }}
+                      />
+                    </div>
                   </div>
                 );
               })}
-              <div style={{ fontSize: 11, color: 'var(--tf-text-muted)', marginTop: 8 }}>
-                {totalVotes} vote{totalVotes !== 1 ? 's' : ''} · {isClosed ? 'Closed' : `Closes ${new Date(poll.closesAt).toLocaleDateString()}`}
+
+              <div className="tf-mono" style={{ fontSize: 10.5, color: 'var(--tf-text-faint)', marginTop: 8 }}>
+                {totalVotes} vote{totalVotes !== 1 ? 's' : ''} · {isClosed ? 'Closed' : `Closes ${new Date(poll.closesAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
               </div>
-            </Card.Body>
-          </Card>
-        );
-      })}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -14,11 +14,10 @@ import { Modal, Spinner, Alert } from 'react-bootstrap';
 import {
   ArrowLeft, Plus, LayoutGrid, GitBranch,
   CalendarDays, Copy, RefreshCw, Download, ExternalLink,
-  Zap, BarChart3,
+  BarChart3, Users, LogOut, Check,
 } from 'lucide-react';
 import { generateCalendarToken, revokeCalendarToken } from '../api';
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 function initials(name) {
   if (!name) return '?';
   const p = name.trim().split(' ');
@@ -40,15 +39,19 @@ function CalendarModal({ show, onHide, board, boardId }) {
 
   const handleGenerate = async () => {
     setGenerating(true);
-    try { const r = await generateCalendarToken(boardId); setCalToken(r.data.calendarToken); }
-    catch { /* ignore */ }
+    try {
+      const r = await generateCalendarToken(boardId);
+      setCalToken(r.data.calendarToken);
+    } catch { /* ignore */ }
     finally { setGenerating(false); }
   };
 
   const handleRevoke = async () => {
     setRevoking(true);
-    try { await revokeCalendarToken(boardId); setCalToken(null); }
-    catch { /* ignore */ }
+    try {
+      await revokeCalendarToken(boardId);
+      setCalToken(null);
+    } catch { /* ignore */ }
     finally { setRevoking(false); }
   };
 
@@ -59,68 +62,126 @@ function CalendarModal({ show, onHide, board, boardId }) {
   };
 
   return (
-    <Modal show={show} onHide={onHide} centered contentClassName="bg-dark text-light border-secondary">
-      <Modal.Header closeButton closeVariant="white" className="border-secondary">
-        <Modal.Title className="fs-6 fw-bold d-flex align-items-center gap-2">
-          <CalendarDays size={17} style={{ color: 'var(--tf-accent)' }} /> Calendar Export
+    <Modal show={show} onHide={onHide} centered>
+      <Modal.Header closeButton>
+        <Modal.Title style={{ fontSize: 16, fontWeight: 650, color: 'var(--tf-ink)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <CalendarDays size={16} style={{ color: 'var(--tf-accent)' }} /> Calendar Subscription.
         </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body style={{ padding: '20px 24px' }}>
         {calToken ? (
           <>
-            <p style={{ fontSize: 12.5, color: 'var(--tf-text-muted)', marginBottom: 10 }}>
-              Subscribe to this live feed in Google Calendar or Apple Calendar.
+            <p className="tf-subtitle" style={{ fontSize: 13, marginBottom: 12 }}>
+              Subscribe to live automated calendar synchronization across Google Calendar, Apple Calendar, or Outlook.
             </p>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 10px', borderRadius: 6,
-              background: 'rgba(255,255,255,0.04)', border: '1px solid var(--tf-border)',
-              marginBottom: 12,
+              padding: '10px 14px', borderRadius: 'var(--tf-radius-sm)',
+              background: 'var(--tf-field)', border: '1px solid transparent',
+              marginBottom: 16,
             }}>
-              <code style={{ flex: 1, fontSize: 11, color: 'var(--tf-accent)', wordBreak: 'break-all' }}>
+              <code className="tf-mono" style={{ flex: 1, fontSize: 11.5, color: 'var(--tf-ink)', wordBreak: 'break-all' }}>
                 {feedUrl}
               </code>
               <button
                 className="tf-icon-btn"
                 onClick={handleCopy}
-                title="Copy"
-                style={{ background: copied ? 'rgba(75,206,151,0.15)' : undefined, color: copied ? 'var(--col-done)' : undefined }}
+                title="Copy URL"
+                style={{ flexShrink: 0 }}
               >
-                <Copy size={13} />
+                {copied ? <Check size={13} style={{ color: 'var(--col-done)' }} /> : <Copy size={13} />}
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <a href={`${feedUrl}&download=true`} target="_blank" rel="noreferrer" className="tf-navbar-btn" style={{ textDecoration: 'none' }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+              <a
+                href={`${feedUrl}&download=true`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn button-outline"
+                style={{ height: 34, fontSize: 12.5, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+              >
                 <Download size={12} /> Download .ics
               </a>
-              <a href={`webcal://${feedUrl.replace(/^https?:\/\//, '')}`} className="tf-navbar-btn" style={{ textDecoration: 'none' }}>
+              <a
+                href={`webcal://${feedUrl.replace(/^https?:\/\//, '')}`}
+                className="btn button-outline"
+                style={{ height: 34, fontSize: 12.5, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 5 }}
+              >
                 <ExternalLink size={12} /> Open in Calendar
               </a>
               <button
-                className="tf-navbar-btn danger"
+                className="btn btn-outline-danger"
                 onClick={handleRevoke}
                 disabled={revoking}
-                style={{ marginLeft: 'auto' }}
+                style={{ marginLeft: 'auto', height: 34, fontSize: 12.5 }}
               >
-                {revoking ? <Spinner size="sm" className="me-1" /> : <RefreshCw size={12} />} Revoke
+                {revoking ? <Spinner size="sm" className="me-1" /> : <RefreshCw size={12} style={{ display: 'inline', marginRight: 4 }} />} Revoke Feed
               </button>
             </div>
           </>
         ) : (
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
             <CalendarDays size={36} style={{ color: 'var(--tf-text-muted)', marginBottom: 12 }} />
-            <p style={{ fontSize: 13, color: 'var(--tf-text-muted)', marginBottom: 16 }}>
-              Generate a secure URL to subscribe to this board's tasks in any calendar app.
+            <p className="tf-subtitle" style={{ fontSize: 13.5, marginBottom: 18 }}>
+              Generate a private, tamper-proof URL token to export and synchronize board tasks with calendar software.
             </p>
-            <button className="tf-navbar-btn active" onClick={handleGenerate} disabled={generating}
-              style={{ margin: '0 auto', display: 'inline-flex', padding: '0 20px', height: 36 }}>
-              {generating ? <Spinner size="sm" className="me-1" /> : <CalendarDays size={13} />}
-              Generate Feed
+            <button
+              className="btn button-primary"
+              onClick={handleGenerate}
+              disabled={generating}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              {generating ? <Spinner size="sm" /> : <CalendarDays size={13} />}
+              Generate Calendar Feed
             </button>
           </div>
         )}
       </Modal.Body>
     </Modal>
+  );
+}
+
+// ── OverlayTriggerUser ────────────────────────────────────────────────────────
+function OverlayTriggerUser({ user, navigate }) {
+  const [open, setOpen] = useState(false);
+  const { logout } = useAuth();
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        className="tf-avatar"
+        onClick={() => setOpen(!open)}
+        title={user?.name}
+      >
+        {user?.name ? (user.name.trim().split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2)) : '?'}
+      </div>
+      {open && (
+        <div
+          className="dropdown-menu show"
+          style={{
+            position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 1100,
+            minWidth: 190,
+          }}
+          onMouseLeave={() => setOpen(false)}
+        >
+          <div style={{ padding: '8px 12px 6px', borderBottom: '1px solid var(--tf-hairline-soft)', marginBottom: 4 }}>
+            <div style={{ fontSize: 13, fontWeight: 650, color: 'var(--tf-ink)' }}>{user?.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--tf-text-muted)', textTransform: 'capitalize' }}>
+              {user?.role?.replace('_', ' ')}
+            </div>
+          </div>
+          <button className="dropdown-item" onClick={() => { setOpen(false); navigate('/dashboard'); }}>
+            <BarChart3 size={13} style={{ display: 'inline', marginRight: 6 }} /> Analytics
+          </button>
+          <button className="dropdown-item" onClick={() => { setOpen(false); navigate('/workspace'); }}>
+            <Users size={13} style={{ display: 'inline', marginRight: 6 }} /> Organization
+          </button>
+          <div style={{ height: 1, background: 'var(--tf-hairline-soft)', margin: '4px 0' }} />
+          <button className="dropdown-item" style={{ color: 'var(--col-danger)' }} onClick={logout}>
+            <LogOut size={13} style={{ display: 'inline', marginRight: 6 }} /> Sign out
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -165,7 +226,7 @@ function BoardInner() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--tf-bg)' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--tf-canvas)' }}>
         <Spinner animation="border" variant="primary" />
       </div>
     );
@@ -175,7 +236,7 @@ function BoardInner() {
 
   return (
     <div className="tf-board-wrapper">
-      {/* ── Mobbin Floating Nav Pill ── */}
+      {/* ── Mobbin Floating Nav Pill Bar ── */}
       <div className="tf-navbar-wrapper">
         <div className="tf-navbar">
           {/* Logo */}
@@ -183,30 +244,30 @@ function BoardInner() {
             <img src="/logo.png" alt="TaskForge" className="brand-logo" />
             <span><span className="tf-brand-blue">Task</span>Forge</span>
           </a>
+
           <WorkspaceSwitcher />
 
-          {/* Board name */}
+          {/* Board Breadcrumb & Title */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-            <button className="tf-navbar-btn" onClick={() => navigate('/boards')} style={{ padding: '0 8px' }}>
+            <button className="tf-navbar-btn" onClick={() => navigate('/boards')} style={{ padding: '0 8px' }} title="Back to boards">
               <ArrowLeft size={14} />
             </button>
             <h1
               className="tf-board-title"
-              style={{ fontSize: 16, fontWeight: 650, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              style={{ fontSize: 15, fontWeight: 650, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
             >
               {board?.name || 'Board'}
             </h1>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--col-done)', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span className="live-dot" />
-              Live
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--col-done)', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+              <span className="live-dot" /> Live
             </span>
           </div>
 
-          {/* Right controls */}
+          {/* Right Controls */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             <NavActionGroup token={localStorage.getItem('token')} />
 
-            {/* Segmented View toggle */}
+            {/* Segmented View Toggle */}
             <div className="segmented-control-track">
               <button
                 className={`segmented-control-item ${viewMode === 'kanban' ? 'active' : ''}`}
@@ -224,38 +285,38 @@ function BoardInner() {
 
             {canEdit && (
               <button className="tf-navbar-btn" onClick={() => setShowCalendar(true)}>
-                <CalendarDays size={14} /> Calendar
+                <CalendarDays size={13} /> Calendar
               </button>
             )}
 
             {canEdit && (
               <button
-                className="tf-navbar-btn active"
+                className="btn button-primary"
                 onClick={() => openCreateForm(board?.columns?.[0]?._id?.toString())}
-                style={{ fontWeight: 600 }}
+                style={{ height: 34, padding: '0 14px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
               >
-                <Plus size={15} /> Add Card
+                <Plus size={14} /> New Issue
               </button>
             )}
 
-            {/* User avatar */}
+            {/* User Avatar Dropdown */}
             <OverlayTriggerUser user={user} navigate={navigate} />
           </div>
         </div>
       </div>
 
       {error && (
-        <Alert variant="danger" className="mx-3 mt-2 py-2 small" dismissible onClose={() => setError('')}>
+        <Alert variant="danger" className="mx-4 mt-3 py-2.5 px-3 mb-0" dismissible onClose={() => setError('')}>
           {error}
         </Alert>
       )}
 
-      {/* Polls */}
+      {/* Polls Panel */}
       {viewMode === 'kanban' && (
         <PollsPanel boardId={boardId} userId={user?._id?.toString()} canManage={canEdit} socket={socket} />
       )}
 
-      {/* ── Kanban ── */}
+      {/* ── Kanban View ── */}
       {viewMode === 'kanban' && (
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="tf-board-canvas">
@@ -283,14 +344,14 @@ function BoardInner() {
         </DragDropContext>
       )}
 
-      {/* ── Graph ── */}
+      {/* ── Dependency Graph View ── */}
       {viewMode === 'graph' && (
-        <div style={{ padding: 16 }}>
+        <div style={{ padding: 24, maxWidth: 1360, margin: '0 auto', width: '100%' }}>
           <DependencyGraph tasks={tasks} />
         </div>
       )}
 
-      {/* Modals / Drawers */}
+      {/* Modals & Drawers */}
       <TaskForm
         show={showForm}
         onHide={() => { setShowForm(false); setEditingTask(null); }}
@@ -314,45 +375,6 @@ function BoardInner() {
         board={board}
         boardId={boardId}
       />
-    </div>
-  );
-}
-
-// Small component to keep BoardInner readable
-function OverlayTriggerUser({ user, navigate }) {
-  const [open, setOpen] = useState(false);
-  const { logout } = useAuth();
-  return (
-    <div style={{ position: 'relative' }}>
-      <div className="tf-avatar" onClick={() => setOpen(!open)} title={user?.name}>
-        {user?.name ? (user.name.trim().split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2)) : '?'}
-      </div>
-      {open && (
-        <div
-          style={{
-            position: 'absolute', right: 0, top: 36, zIndex: 200,
-            background: 'var(--tf-col-bg)', border: '1px solid var(--tf-border)',
-            borderRadius: 8, boxShadow: 'var(--tf-shadow-md)',
-            minWidth: 160, padding: 6, animation: 'dropDown 0.15s ease',
-          }}
-          onMouseLeave={() => setOpen(false)}
-        >
-          <div style={{ padding: '6px 10px', fontSize: 12.5, color: 'var(--tf-text-muted)', borderBottom: '1px solid var(--tf-border)', marginBottom: 4 }}>
-            <strong style={{ color: 'var(--tf-text-strong)' }}>{user?.name}</strong><br />
-            <span style={{ textTransform: 'capitalize' }}>{user?.role?.replace('_', ' ')}</span>
-          </div>
-          <button className="tf-add-card-btn" style={{ width: '100%', margin: 0, padding: '7px 10px' }} onClick={() => { setOpen(false); navigate('/dashboard'); }}>
-            <BarChart3 size={13} /> Dashboard
-          </button>
-          <button className="tf-add-card-btn" style={{ width: '100%', margin: 0, padding: '7px 10px' }} onClick={() => { setOpen(false); navigate('/workspace'); }}>
-            <Zap size={13} /> Workspace
-          </button>
-          <hr style={{ margin: '4px 0', borderColor: 'var(--tf-border)' }} />
-          <button className="tf-add-card-btn" style={{ width: '100%', margin: 0, padding: '7px 10px', color: '#fc8181' }} onClick={logout}>
-            Sign out
-          </button>
-        </div>
-      )}
     </div>
   );
 }

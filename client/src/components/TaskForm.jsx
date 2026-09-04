@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Modal, Form, Button, Row, Col, Badge } from 'react-bootstrap';
-import { X } from 'lucide-react';
+import { Modal, Row, Col } from 'react-bootstrap';
+import { X, Link2 } from 'lucide-react';
 
 export default function TaskForm({ show, onHide, onSubmit, task, columns, members, allTasks = [] }) {
   const [title, setTitle] = useState('');
@@ -40,7 +40,6 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
     });
   };
 
-  // Available tasks for dependency selection (exclude self if editing)
   const availableTasks = allTasks.filter((t) => {
     if (task && t._id.toString() === task._id.toString()) return false;
     return true;
@@ -64,38 +63,40 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
   return (
     <Modal show={show} onHide={onHide} centered size="lg">
       <Modal.Header closeButton>
-        <Modal.Title style={{ fontSize: 18, fontWeight: 650, color: 'var(--tf-ink)' }}>
-          {task ? 'Edit Task' : 'New Task'}
+        <Modal.Title style={{ fontSize: 17, fontWeight: 650, color: 'var(--tf-ink)' }}>
+          {task ? 'Edit Issue.' : 'Create New Issue.'}
         </Modal.Title>
       </Modal.Header>
       <Modal.Body style={{ padding: 24 }}>
-        <Form onSubmit={handleSubmit}>
-          <Form.Group className="mb-3">
-            <Form.Label className="form-label">Title</Form.Label>
-            <Form.Control
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: 16 }}>
+            <label className="form-label">Issue Title</label>
+            <input
               type="text"
+              className="form-control"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              placeholder="Task title"
+              placeholder="e.g. Implement OAuth token revocation endpoint"
             />
-          </Form.Group>
+          </div>
 
-          <Form.Group className="mb-3">
-            <Form.Label className="form-label">Description</Form.Label>
-            <Form.Control
-              as="textarea"
+          <div style={{ marginBottom: 16 }}>
+            <label className="form-label">Description & Acceptance Criteria</label>
+            <textarea
+              className="form-control"
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional details…"
+              placeholder="Provide technical context, steps to reproduce, or requirements…"
             />
-          </Form.Group>
+          </div>
 
           <Row className="mb-3">
-            <Col>
-              <Form.Label className="form-label">Column</Form.Label>
-              <Form.Select
+            <Col sm={6}>
+              <label className="form-label">Target Stage / Column</label>
+              <select
+                className="form-select"
                 value={columnId}
                 onChange={(e) => setColumnId(e.target.value)}
               >
@@ -104,11 +105,12 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
                     {c.name}
                   </option>
                 ))}
-              </Form.Select>
+              </select>
             </Col>
-            <Col>
-              <Form.Label className="form-label">Assignee</Form.Label>
-              <Form.Select
+            <Col sm={6}>
+              <label className="form-label">Assignee</label>
+              <select
+                className="form-select"
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
               >
@@ -118,48 +120,50 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
                     {m.name}
                   </option>
                 ))}
-              </Form.Select>
+              </select>
             </Col>
           </Row>
 
-          <Form.Group className="mb-3">
-            <Form.Label className="form-label">Due Date</Form.Label>
-            <Form.Control
+          <div style={{ marginBottom: 16 }}>
+            <label className="form-label">Target Completion Date</label>
+            <input
               type="date"
+              className="form-control"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
             />
-          </Form.Group>
+          </div>
 
           {/* Dependencies multi-select */}
-          <Form.Group className="mb-4">
-            <Form.Label className="form-label">Depends On (prerequisites)</Form.Label>
+          <div style={{ marginBottom: 24 }}>
+            <label className="form-label">Dependencies (prerequisite issues)</label>
 
-            {/* Selected dependencies */}
             {dependsOn.length > 0 && (
-              <div className="d-flex flex-wrap gap-2 mb-2">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                 {dependsOn.map((depId) => (
                   <span
                     key={depId}
                     className="tf-chip dep"
                     style={{ cursor: 'pointer' }}
                     onClick={() => removeDependency(depId)}
+                    title="Click to remove"
                   >
+                    <Link2 size={11} />
                     {getTaskTitle(depId)}
-                    <X size={12} />
+                    <X size={11} style={{ marginLeft: 3 }} />
                   </span>
                 ))}
               </div>
             )}
 
-            {/* Dropdown to add dependencies */}
-            <Form.Select
+            <select
+              className="form-select"
               value=""
               onChange={(e) => {
                 if (e.target.value) addDependency(e.target.value);
               }}
             >
-              <option value="">+ Add dependency…</option>
+              <option value="">+ Link prerequisite issue…</option>
               {availableTasks
                 .filter((t) => !dependsOn.includes(t._id.toString()))
                 .map((t) => (
@@ -167,14 +171,25 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
                     {t.title} {t.status === 'done' ? '✓' : ''}
                   </option>
                 ))}
-            </Form.Select>
-          </Form.Group>
-
-          <div className="d-flex gap-2 justify-content-end">
-            <Button variant="outline-secondary" onClick={onHide}>Cancel</Button>
-            <Button variant="primary" type="submit">{task ? 'Save Changes' : 'Create Task'}</Button>
+            </select>
           </div>
-        </Form>
+
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 14, borderTop: '1px solid var(--tf-hairline-soft)' }}>
+            <button
+              type="button"
+              className="btn button-outline"
+              onClick={onHide}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn button-primary"
+            >
+              {task ? 'Update Issue' : 'Submit Issue'}
+            </button>
+          </div>
+        </form>
       </Modal.Body>
     </Modal>
   );

@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Modal, Form, Button, Table, Badge, Alert } from 'react-bootstrap';
+import { Modal, Alert } from 'react-bootstrap';
 import { Plus, Trash2, X } from 'lucide-react';
 
-/**
- * Generate a short unique ID for blueprint entries (client-side only).
- */
 function genBpId() {
   return Math.random().toString(36).slice(2, 10);
 }
@@ -40,7 +37,6 @@ export default function TemplateEditor({ show, onHide, onSave, template }) {
   const removeRow = (bpId) => {
     setRows((prev) => {
       const without = prev.filter((r) => r.blueprintId !== bpId);
-      // Also remove this bpId from any other row's dependsOn
       return without.map((r) => ({
         ...r,
         dependsOn: r.dependsOn.filter((d) => d !== bpId),
@@ -91,122 +87,149 @@ export default function TemplateEditor({ show, onHide, onSave, template }) {
   return (
     <Modal show={show} onHide={onHide} centered size="xl">
       <Modal.Header closeButton>
-        <Modal.Title style={{ fontSize: 18, fontWeight: 650, color: 'var(--tf-ink)' }}>
-          {template ? 'Edit Template' : 'New Template'}
+        <Modal.Title style={{ fontSize: 17, fontWeight: 650, color: 'var(--tf-ink)' }}>
+          {template ? 'Edit Sprint Blueprint.' : 'New Sprint Blueprint.'}
         </Modal.Title>
       </Modal.Header>
       <Modal.Body style={{ padding: 24 }}>
-        <Form onSubmit={handleSubmit}>
-          {error && <Alert variant="danger" className="py-2 mb-3">{error}</Alert>}
+        <form onSubmit={handleSubmit}>
+          {error && <Alert variant="danger" className="py-2.5 px-3 mb-3">{error}</Alert>}
 
-          <Form.Group className="mb-4">
-            <Form.Label className="form-label">Template Name</Form.Label>
-            <Form.Control
+          <div style={{ marginBottom: 20 }}>
+            <label className="form-label">Blueprint Identifier</label>
+            <input
               type="text"
+              className="form-control"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder='e.g. "Freshers Induction"'
+              placeholder='e.g. "Release Cycle Pipeline"'
               required
             />
-          </Form.Group>
+          </div>
 
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <span className="form-label mb-0">Task Blueprint</span>
-            <Button variant="outline-secondary" size="sm" onClick={addRow}>
-              <Plus size={14} className="me-1" /> Add Task
-            </Button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span className="tf-eyebrow" style={{ margin: 0 }}>Blueprint Stage Tasks ({rows.length})</span>
+            <button type="button" className="btn button-outline" style={{ height: 32, fontSize: 12.5 }} onClick={addRow}>
+              <Plus size={13} style={{ display: 'inline', marginRight: 4 }} /> Add Step
+            </button>
           </div>
 
           {rows.length === 0 ? (
-            <p className="text-muted text-center small py-4">No tasks yet. Click "Add Task" to start.</p>
+            <div style={{
+              textAlign: 'center', padding: '36px 20px',
+              background: 'var(--tf-canvas-soft)', borderRadius: 'var(--tf-radius-sm)',
+              border: '1px dashed var(--tf-hairline)', color: 'var(--tf-text-muted)', fontSize: 13,
+            }}>
+              No steps added yet. Click "+ Add Step" to construct the blueprint sequence.
+            </div>
           ) : (
-            <div style={{ maxHeight: 420, overflowY: 'auto', borderRadius: 16, border: '1px solid var(--tf-hairline)' }}>
-              <Table size="sm" responsive className="mb-0" style={{ fontSize: '0.85rem' }}>
-                <thead style={{ background: 'var(--tf-canvas-soft)' }}>
+            <div style={{ maxHeight: 420, overflowY: 'auto', borderRadius: 'var(--tf-radius-sm)', border: '1px solid var(--tf-hairline)' }}>
+              <table className="tf-data-table">
+                <thead>
                   <tr>
-                    <th style={{ padding: '10px 14px', width: '28%' }}>Title</th>
-                    <th style={{ padding: '10px 14px', width: '18%' }}>Role</th>
-                    <th style={{ padding: '10px 14px', width: '14%' }}>Offset (days)</th>
-                    <th style={{ padding: '10px 14px', width: '32%' }}>Depends On</th>
-                    <th style={{ padding: '10px 14px', width: '8%' }}></th>
+                    <th style={{ width: '28%' }}>Task Title</th>
+                    <th style={{ width: '18%' }}>Target Role</th>
+                    <th style={{ width: '14%' }}>Day Offset</th>
+                    <th style={{ width: '32%' }}>Dependencies</th>
+                    <th style={{ width: '8%', textAlign: 'center' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.blueprintId}>
-                      <td style={{ padding: '8px 12px' }}>
-                        <Form.Control
-                          size="sm"
+                      <td>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ padding: '6px 10px', fontSize: 12.5 }}
                           value={row.title}
                           onChange={(e) => updateRow(row.blueprintId, 'title', e.target.value)}
-                          placeholder="Task title"
+                          placeholder="Task name"
+                          required
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <Form.Select
-                          size="sm"
+                      <td>
+                        <input
+                          type="text"
+                          className="form-control"
+                          style={{ padding: '6px 10px', fontSize: 12.5 }}
                           value={row.role}
                           onChange={(e) => updateRow(row.blueprintId, 'role', e.target.value)}
-                        >
-                          <option value="">Any</option>
-                          <option value="head">Head</option>
-                          <option value="joint_head">Joint Head</option>
-                          <option value="member">Member</option>
-                        </Form.Select>
+                          placeholder="Role (e.g. backend)"
+                        />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <Form.Control
-                          size="sm"
+                      <td>
+                        <input
                           type="number"
+                          className="form-control"
+                          style={{ padding: '6px 10px', fontSize: 12.5 }}
                           value={row.offsetDaysFromEvent}
                           onChange={(e) => updateRow(row.blueprintId, 'offsetDaysFromEvent', parseInt(e.target.value) || 0)}
                         />
                       </td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <div className="d-flex flex-wrap gap-1 mb-1">
-                          {row.dependsOn.map((depId) => (
-                            <span
-                              key={depId}
-                              className="tf-chip dep"
-                              style={{ cursor: 'pointer', fontSize: '10px' }}
-                              onClick={() => removeDep(row.blueprintId, depId)}
-                            >
-                              {getTitle(depId)} <X size={10} />
-                            </span>
-                          ))}
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {row.dependsOn.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                              {row.dependsOn.map((depId) => (
+                                <span
+                                  key={depId}
+                                  className="tf-chip dep"
+                                  style={{ cursor: 'pointer', fontSize: 10.5 }}
+                                  onClick={() => removeDep(row.blueprintId, depId)}
+                                >
+                                  {getTitle(depId)}
+                                  <X size={10} style={{ marginLeft: 2 }} />
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <select
+                            className="form-select"
+                            style={{ padding: '5px 8px', fontSize: 12 }}
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value) addDep(row.blueprintId, e.target.value);
+                            }}
+                          >
+                            <option value="">+ Add dependency…</option>
+                            {rows
+                              .filter((r) => r.blueprintId !== row.blueprintId && !row.dependsOn.includes(r.blueprintId))
+                              .map((r) => (
+                                <option key={r.blueprintId} value={r.blueprintId}>
+                                  {r.title || '(untitled)'}
+                                </option>
+                              ))}
+                          </select>
                         </div>
-                        <Form.Select
-                          size="sm"
-                          value=""
-                          onChange={(e) => { if (e.target.value) addDep(row.blueprintId, e.target.value); }}
-                        >
-                          <option value="">+ Add…</option>
-                          {rows
-                            .filter((r) => r.blueprintId !== row.blueprintId && !row.dependsOn.includes(r.blueprintId))
-                            .map((r) => (
-                              <option key={r.blueprintId} value={r.blueprintId}>
-                                {r.title || '(untitled)'}
-                              </option>
-                            ))}
-                        </Form.Select>
                       </td>
-                      <td className="text-center" style={{ padding: '8px 12px' }}>
-                        <Button variant="link" size="sm" className="p-0 text-danger" onClick={() => removeRow(row.blueprintId)}>
-                          <Trash2 size={14} />
-                        </Button>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          className="tf-icon-btn delete"
+                          onClick={() => removeRow(row.blueprintId)}
+                          title="Remove row"
+                          style={{ margin: '0 auto' }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-              </Table>
+              </table>
             </div>
           )}
 
-          <div className="d-flex gap-2 justify-content-end mt-4">
-            <Button variant="outline-secondary" onClick={onHide}>Cancel</Button>
-            <Button variant="primary" type="submit">{template ? 'Save Changes' : 'Create Template'}</Button>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 16, borderTop: '1px solid var(--tf-hairline-soft)', marginTop: 20 }}>
+            <button type="button" className="btn button-outline" onClick={onHide}>
+              Cancel
+            </button>
+            <button type="submit" className="btn button-primary">
+              Save Blueprint
+            </button>
           </div>
-        </Form>
+        </form>
       </Modal.Body>
     </Modal>
   );
