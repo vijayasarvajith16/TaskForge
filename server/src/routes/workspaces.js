@@ -1,14 +1,15 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
 const { ObjectId } = require('mongodb');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { requireWorkspaceMembership } = require('../middleware/requireWorkspaceMembership');
 const {
   createWorkspace, findWorkspaceById, findByInviteCode,
   addMember, regenerateInviteCode, updateWorkspaceWebhook,
 } = require('../models/workspaces');
-const { updateUser, findByWorkspace } = require('../models/users');
+const { createMembership, findMembership } = require('../models/memberships');
+const { findByWorkspace } = require('../models/users');
 const { getDb } = require('../db');
-const { notifyWebhook } = require('../utils/webhook');
 
 const router = express.Router();
 
@@ -18,14 +19,15 @@ router.post('/', authenticate, async (req, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
 
-    if (req.user.workspaceId) {
-      return res.status(400).json({ error: 'You already belong to a workspace' });
-    }
-
     const inviteCode = uuidv4().slice(0, 8).toUpperCase();
     const workspace = await createWorkspace({ name, ownerId: req.user._id.toString(), inviteCode });
 
-    await updateUser(req.user._id, { workspaceId: workspace._id, role: 'head' });
+    // Explicit membership row created with role: 'head'
+    await createMembership({
+      userId: req.user._id,
+      workspaceId: workspace._id,
+      role: 'head',
+    });
 
     res.status(201).json(workspace);
   } catch (err) {
@@ -35,7 +37,7 @@ router.post('/', authenticate, async (req, res) => {
 });
 
 // GET /api/workspaces/:id — get workspace details
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, requireWorkspaceMembership(), async (req, res) => {
   try {
     const workspace = await findWorkspaceById(req.params.id);
     if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
@@ -44,6 +46,7 @@ router.get('/:id', authenticate, async (req, res) => {
 
     res.json({
       ...workspace,
+      userRole: req.membership.role,
       members: members.map((m) => ({ _id: m._id, name: m.name, email: m.email, role: m.role })),
     });
   } catch (err) {
@@ -53,7 +56,7 @@ router.get('/:id', authenticate, async (req, res) => {
 });
 
 // POST /api/workspaces/:id/invite — regenerate invite code (head/joint_head only)
-router.post('/:id/invite', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.post('/:id/invite', authenticate, requireWorkspaceMembership({ minRole: 'joint_head' }), async (req, res) => {
   try {
     const workspace = await findWorkspaceById(req.params.id);
     if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
@@ -71,15 +74,21 @@ router.post('/:id/invite', authenticate, authorize('head', 'joint_head'), async 
 // POST /api/workspaces/join/:code — join via invite code
 router.post('/join/:code', authenticate, async (req, res) => {
   try {
-    if (req.user.workspaceId) {
-      return res.status(400).json({ error: 'You already belong to a workspace' });
-    }
-
     const workspace = await findByInviteCode(req.params.code);
     if (!workspace) return res.status(404).json({ error: 'Invalid invite code' });
 
+    const existingMembership = await findMembership(req.user._id, workspace._id);
+    if (existingMembership) {
+      return res.status(400).json({ error: 'You are already a member of this workspace', workspace });
+    }
+
+    // Add membership
+    await createMembership({
+      userId: req.user._id,
+      workspaceId: workspace._id,
+      role: 'member',
+    });
     await addMember(workspace._id.toString(), req.user._id.toString());
-    await updateUser(req.user._id, { workspaceId: workspace._id });
 
     res.json({ message: 'Joined workspace successfully', workspace });
   } catch (err) {
@@ -89,12 +98,9 @@ router.post('/join/:code', authenticate, async (req, res) => {
 });
 
 // GET /api/workspaces/:id/workload — task count per member
-router.get('/:id/workload', authenticate, async (req, res) => {
+router.get('/:id/workload', authenticate, requireWorkspaceMembership(), async (req, res) => {
   try {
-    const workspace = await findWorkspaceById(req.params.id);
-    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
-
-    const members = await findByWorkspace(workspace._id.toString());
+    const members = await findByWorkspace(req.params.id);
     const db = getDb();
 
     const boards = await db.collection('boards').find({ workspaceId: new ObjectId(req.params.id) }).toArray();
@@ -127,12 +133,9 @@ router.get('/:id/workload', authenticate, async (req, res) => {
 });
 
 // GET /api/workspaces/:id/leaderboard — completed tasks per member
-router.get('/:id/leaderboard', authenticate, async (req, res) => {
+router.get('/:id/leaderboard', authenticate, requireWorkspaceMembership(), async (req, res) => {
   try {
-    const workspace = await findWorkspaceById(req.params.id);
-    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
-
-    const members = await findByWorkspace(workspace._id.toString());
+    const members = await findByWorkspace(req.params.id);
     const db = getDb();
 
     const boards = await db.collection('boards').find({ workspaceId: new ObjectId(req.params.id) }).toArray();
@@ -182,7 +185,7 @@ router.get('/:id/leaderboard', authenticate, async (req, res) => {
 // ── Webhook settings ─────────────────────────────────────────────────────────
 
 // PATCH /api/workspaces/:id/webhook — save webhook URL + provider (head/joint_head only)
-router.patch('/:id/webhook', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.patch('/:id/webhook', authenticate, requireWorkspaceMembership({ minRole: 'joint_head' }), async (req, res) => {
   try {
     const { webhookUrl, webhookProvider } = req.body;
     if (!webhookUrl || !webhookProvider) {
@@ -190,12 +193,6 @@ router.patch('/:id/webhook', authenticate, authorize('head', 'joint_head'), asyn
     }
     if (!['slack', 'discord'].includes(webhookProvider)) {
       return res.status(400).json({ error: 'webhookProvider must be "slack" or "discord"' });
-    }
-
-    const workspace = await findWorkspaceById(req.params.id);
-    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
-    if (workspace._id.toString() !== req.user.workspaceId?.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
     }
 
     await updateWorkspaceWebhook(req.params.id, { webhookUrl, webhookProvider });
@@ -207,14 +204,8 @@ router.patch('/:id/webhook', authenticate, authorize('head', 'joint_head'), asyn
 });
 
 // DELETE /api/workspaces/:id/webhook — remove webhook (head/joint_head only)
-router.delete('/:id/webhook', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.delete('/:id/webhook', authenticate, requireWorkspaceMembership({ minRole: 'joint_head' }), async (req, res) => {
   try {
-    const workspace = await findWorkspaceById(req.params.id);
-    if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
-    if (workspace._id.toString() !== req.user.workspaceId?.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     await updateWorkspaceWebhook(req.params.id, { webhookUrl: null, webhookProvider: null });
     res.json({ message: 'Webhook removed' });
   } catch (err) {
@@ -224,18 +215,14 @@ router.delete('/:id/webhook', authenticate, authorize('head', 'joint_head'), asy
 });
 
 // POST /api/workspaces/:id/webhook/test — send a test message (head/joint_head only)
-router.post('/:id/webhook/test', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.post('/:id/webhook/test', authenticate, requireWorkspaceMembership({ minRole: 'joint_head' }), async (req, res) => {
   try {
     const workspace = await findWorkspaceById(req.params.id);
     if (!workspace) return res.status(404).json({ error: 'Workspace not found' });
-    if (workspace._id.toString() !== req.user.workspaceId?.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
     if (!workspace.webhookUrl) {
       return res.status(400).json({ error: 'No webhook configured' });
     }
 
-    // For the test, fire synchronously so we can report pass/fail to the UI
     const { webhookUrl, webhookProvider } = workspace;
     const payload = webhookProvider === 'slack'
       ? { text: '✅ TaskForge webhook test — connection confirmed!' }

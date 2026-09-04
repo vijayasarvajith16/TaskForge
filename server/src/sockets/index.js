@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
-const { findByBoard, updateTask } = require('../models/tasks');
+const { findBoardById } = require('../models/boards');
+const { findMembership } = require('../models/memberships');
+const { updateTask } = require('../models/tasks');
 const { setUserSocket, removeUserSocket } = require('../redis');
 
 function initSockets(io) {
@@ -27,9 +29,26 @@ function initSockets(io) {
     await setUserSocket(userId, socket.id);
 
     // ── join_board ─────────────────────────────────
-    socket.on('join_board', ({ boardId }) => {
-      socket.join(boardId);
-      console.log(`Socket ${socket.id} joined board room: ${boardId}`);
+    socket.on('join_board', async ({ boardId }) => {
+      try {
+        if (!boardId) return;
+        const board = await findBoardById(boardId);
+        if (!board) {
+          return socket.emit('error', { message: 'Board not found' });
+        }
+
+        // Verify user has explicit membership in board's workspace
+        const membership = await findMembership(userId, board.workspaceId);
+        if (!membership) {
+          console.warn(`[Socket Security] User ${userId} denied join_board ${boardId} — not a member of workspace ${board.workspaceId}`);
+          return socket.emit('error', { message: 'Not a member of this workspace' });
+        }
+
+        socket.join(boardId);
+        console.log(`Socket ${socket.id} (user: ${userId}, role: ${membership.role}) joined board room: ${boardId}`);
+      } catch (err) {
+        console.error('Socket join_board error:', err);
+      }
     });
 
     // ── task_moved ─────────────────────────────────

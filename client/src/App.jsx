@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import WorkspacePage from './pages/WorkspacePage';
@@ -12,8 +13,8 @@ function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div className="min-vh-100 bg-dark d-flex align-items-center justify-content-center">
-        <Spinner animation="border" variant="primary" />
+      <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ background: 'var(--tf-canvas)' }}>
+        <Spinner animation="border" style={{ color: 'var(--tf-ink)' }} />
       </div>
     );
   }
@@ -25,8 +26,8 @@ function AppRoutes() {
 
   if (loading) {
     return (
-      <div className="min-vh-100 bg-dark d-flex align-items-center justify-content-center">
-        <Spinner animation="border" variant="primary" />
+      <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ background: 'var(--tf-canvas)' }}>
+        <Spinner animation="border" style={{ color: 'var(--tf-ink)' }} />
       </div>
     );
   }
@@ -46,10 +47,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   );
 }

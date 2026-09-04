@@ -62,48 +62,48 @@ export default function PollsPanel({ boardId, userId, canManage, socket }) {
   if (polls.length === 0 && !canManage) return null;
 
   return (
-    <div className="mb-3 px-2">
+    <div className="mb-3 px-4">
       <div className="d-flex justify-content-between align-items-center mb-2">
-        <span className="small fw-semibold text-secondary">
-          <BarChart3 size={14} className="me-1" />Polls
+        <span className="form-label mb-0" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <BarChart3 size={15} style={{ color: 'var(--tf-accent)' }} /> Active Polls
         </span>
         {canManage && (
-          <Button variant="outline-primary" size="sm" style={{ fontSize: '0.7rem', padding: '2px 8px' }} onClick={() => setShowCreate(!showCreate)}>
-            <Plus size={12} /> New
-          </Button>
+          <button className="tf-navbar-btn active" style={{ height: 30, padding: '0 12px', fontSize: 12 }} onClick={() => setShowCreate(!showCreate)}>
+            <Plus size={13} /> New Poll
+          </button>
         )}
       </div>
 
       {showCreate && (
-        <Card className="bg-dark border-secondary mb-2">
-          <Card.Body className="p-2">
-            {error && <Alert variant="danger" className="py-1 small mb-2">{error}</Alert>}
+        <Card style={{ background: 'var(--tf-canvas)', border: '1px solid var(--tf-hairline)', borderRadius: 16 }} className="mb-3">
+          <Card.Body className="p-3">
+            {error && <Alert variant="danger" className="py-2 small mb-2">{error}</Alert>}
             <Form onSubmit={handleCreate}>
               <Form.Control
-                size="sm" className="bg-dark text-light border-secondary mb-2"
+                size="sm" className="mb-2"
                 placeholder="Poll question" value={question} onChange={(e) => setQuestion(e.target.value)}
               />
               {options.map((opt, i) => (
-                <div key={i} className="d-flex gap-1 mb-1">
+                <div key={i} className="d-flex gap-2 mb-2">
                   <Form.Control
-                    size="sm" className="bg-dark text-light border-secondary"
+                    size="sm"
                     placeholder={`Option ${i + 1}`} value={opt}
                     onChange={(e) => { const n = [...options]; n[i] = e.target.value; setOptions(n); }}
                   />
                   {options.length > 2 && (
                     <Button variant="link" size="sm" className="p-0 text-danger" onClick={() => setOptions(options.filter((_, j) => j !== i))}>
-                      <X size={12} />
+                      <X size={14} />
                     </Button>
                   )}
                 </div>
               ))}
-              <Button variant="link" size="sm" className="p-0 text-primary mb-2" style={{ fontSize: '0.7rem' }}
+              <Button variant="link" size="sm" className="p-0 text-primary mb-3" style={{ fontSize: '0.8rem', fontWeight: 600 }}
                 onClick={() => setOptions([...options, ''])}>+ Add option</Button>
-              <Form.Control size="sm" type="datetime-local" className="bg-dark text-light border-secondary mb-2"
+              <Form.Control size="sm" type="datetime-local" className="mb-3"
                 value={closesAt} onChange={(e) => setClosesAt(e.target.value)} />
-              <div className="d-flex gap-1 justify-content-end">
-                <Button variant="outline-secondary" size="sm" style={{ fontSize: '0.7rem' }} onClick={() => setShowCreate(false)}>Cancel</Button>
-                <Button variant="primary" size="sm" type="submit" style={{ fontSize: '0.7rem' }}>Create</Button>
+              <div className="d-flex gap-2 justify-content-end">
+                <Button variant="outline-secondary" size="sm" onClick={() => setShowCreate(false)}>Cancel</Button>
+                <Button variant="primary" size="sm" type="submit">Create Poll</Button>
               </div>
             </Form>
           </Card.Body>
@@ -116,14 +116,14 @@ export default function PollsPanel({ boardId, userId, canManage, socket }) {
         const userVotedIndex = poll.options.findIndex((o) => o.votes?.some((v) => v.toString() === userId));
 
         return (
-          <Card key={poll._id.toString()} className="bg-dark border-secondary mb-2">
-            <Card.Body className="p-2">
-              <div className="d-flex justify-content-between align-items-start mb-1">
-                <span className="small fw-semibold text-light">{poll.question}</span>
+          <Card key={poll._id.toString()} style={{ background: 'var(--tf-canvas-soft)', border: '1px solid var(--tf-hairline-soft)', borderRadius: 16 }} className="mb-2">
+            <Card.Body className="p-3">
+              <div className="d-flex justify-content-between align-items-start mb-2">
+                <span style={{ fontSize: 14, fontWeight: 650, color: 'var(--tf-ink)' }}>{poll.question}</span>
                 {isClosed ? (
-                  <Badge bg="secondary" style={{ fontSize: '0.55rem' }}>Closed</Badge>
+                  <span className="tf-chip" style={{ fontSize: 10 }}>Closed</span>
                 ) : (
-                  <Badge bg="success" style={{ fontSize: '0.55rem' }}>Active</Badge>
+                  <span className="tf-badge-popular" style={{ fontSize: 10 }}>Active</span>
                 )}
               </div>
               {poll.options.map((opt, i) => {
@@ -131,22 +131,22 @@ export default function PollsPanel({ boardId, userId, canManage, socket }) {
                 const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
                 const isMyVote = i === userVotedIndex;
                 return (
-                  <div key={i} className="mb-1" style={{ cursor: isClosed ? 'default' : 'pointer' }}
+                  <div key={i} className="mb-2" style={{ cursor: isClosed ? 'default' : 'pointer' }}
                     onClick={() => !isClosed && handleVote(poll._id.toString(), i)}>
-                    <div className="d-flex justify-content-between align-items-center" style={{ fontSize: '0.72rem' }}>
-                      <span className={isMyVote ? 'text-primary fw-semibold' : 'text-light'}>
-                        {isMyVote && <Vote size={10} className="me-1" />}{opt.text}
+                    <div className="d-flex justify-content-between align-items-center mb-1" style={{ fontSize: '0.82rem' }}>
+                      <span style={{ fontWeight: isMyVote ? 650 : 500, color: 'var(--tf-ink)' }}>
+                        {isMyVote && <Vote size={12} className="me-1" style={{ color: 'var(--tf-accent)' }} />}{opt.text}
                       </span>
-                      <span className="text-secondary">{count} ({pct}%)</span>
+                      <span style={{ fontSize: 11, color: 'var(--tf-text-muted)' }}>{count} ({pct}%)</span>
                     </div>
                     <ProgressBar
                       now={pct} variant={isMyVote ? 'primary' : 'secondary'}
-                      style={{ height: 4, backgroundColor: 'rgba(255,255,255,0.05)' }}
+                      style={{ height: 6, borderRadius: 9999, backgroundColor: 'var(--tf-hairline)' }}
                     />
                   </div>
                 );
               })}
-              <div className="text-secondary mt-1" style={{ fontSize: '0.6rem' }}>
+              <div style={{ fontSize: 11, color: 'var(--tf-text-muted)', marginTop: 8 }}>
                 {totalVotes} vote{totalVotes !== 1 ? 's' : ''} · {isClosed ? 'Closed' : `Closes ${new Date(poll.closesAt).toLocaleDateString()}`}
               </div>
             </Card.Body>

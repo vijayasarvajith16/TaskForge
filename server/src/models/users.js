@@ -5,8 +5,12 @@ function col() {
   return getDb().collection('users');
 }
 
-async function createUser({ name, email, passwordHash, role = 'member', workspaceId = null }) {
-  const doc = { name, email, passwordHash, role, workspaceId, createdAt: new Date() };
+/**
+ * Account-level user creation.
+ * Workspaces and roles are managed strictly via the memberships collection.
+ */
+async function createUser({ name, email, passwordHash }) {
+  const doc = { name, email, passwordHash, createdAt: new Date() };
   const result = await col().insertOne(doc);
   return { ...doc, _id: result.insertedId };
 }
@@ -16,11 +20,36 @@ async function findByEmail(email) {
 }
 
 async function findUserById(id) {
+  if (!id) return null;
   return col().findOne({ _id: new ObjectId(id) });
 }
 
+/**
+ * Retrieve all users belonging to a workspace via the memberships collection.
+ * Attaches the per-workspace role onto each returned user object.
+ */
 async function findByWorkspace(workspaceId) {
-  return col().find({ workspaceId: new ObjectId(workspaceId) }).toArray();
+  if (!workspaceId) return [];
+  const db = getDb();
+  const memberships = await db.collection('memberships')
+    .find({ workspaceId: new ObjectId(workspaceId) })
+    .toArray();
+
+  if (memberships.length === 0) return [];
+
+  const userIds = memberships.map((m) => m.userId);
+  const users = await col().find({ _id: { $in: userIds } }).toArray();
+
+  const membershipMap = new Map(memberships.map((m) => [m.userId.toString(), m]));
+
+  return users.map((u) => {
+    const mem = membershipMap.get(u._id.toString());
+    return {
+      ...u,
+      role: mem?.role || 'member',
+      joinedAt: mem?.joinedAt || u.createdAt,
+    };
+  });
 }
 
 async function updateUser(id, updates) {

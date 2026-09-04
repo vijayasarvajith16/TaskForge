@@ -6,7 +6,8 @@ import { BoardProvider, useBoard } from '../context/BoardContext';
 import Column from './Column';
 import TaskForm from './TaskForm';
 import DependencyGraph from './DependencyGraph';
-import NotificationBell from './NotificationBell';
+import NavActionGroup from './NavActionGroup';
+import WorkspaceSwitcher from './WorkspaceSwitcher';
 import TaskDetailDrawer from './TaskDetailDrawer';
 import PollsPanel from './PollsPanel';
 import { Modal, Spinner, Alert } from 'react-bootstrap';
@@ -174,71 +175,72 @@ function BoardInner() {
 
   return (
     <div className="tf-board-wrapper">
-      {/* ── Global navbar ── */}
-      <div className="tf-navbar">
-        {/* Logo */}
-        <a onClick={() => navigate('/boards')} className="tf-navbar-brand" style={{ cursor: 'pointer', textDecoration: 'none' }}>
-          <img src="/logo.png" alt="TaskForge" style={{ width: 26, height: 26, borderRadius: 6 }} />
-          <span><span className="tf-brand-blue">Task</span>Forge</span>
-        </a>
+      {/* ── Mobbin Floating Nav Pill ── */}
+      <div className="tf-navbar-wrapper">
+        <div className="tf-navbar">
+          {/* Logo */}
+          <a onClick={() => navigate('/boards')} className="tf-navbar-brand" style={{ cursor: 'pointer', textDecoration: 'none' }}>
+            <img src="/logo.png" alt="TaskForge" className="brand-logo" />
+            <span><span className="tf-brand-blue">Task</span>Forge</span>
+          </a>
+          <WorkspaceSwitcher />
 
-        {/* Board name */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-          <button className="tf-navbar-btn" onClick={() => navigate('/boards')} style={{ padding: '0 8px' }}>
-            <ArrowLeft size={14} />
-          </button>
-          <h1
-            className="tf-board-title"
-            style={{ fontSize: 14, fontWeight: 700, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {board?.name || 'Board'}
-          </h1>
-          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--col-done)', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <span className="live-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--col-done)', display: 'inline-block' }} />
-            Live
-          </span>
-        </div>
-
-        {/* Right controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <NotificationBell token={localStorage.getItem('token')} />
-
-          {/* View toggle */}
-          <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--tf-border)' }}>
-            <button
-              className={`tf-navbar-btn ${viewMode === 'kanban' ? 'active' : ''}`}
-              onClick={() => setViewMode('kanban')}
-              style={{ borderRadius: 0, border: 'none', borderRight: '1px solid var(--tf-border)' }}
-            >
-              <LayoutGrid size={13} /> Board
+          {/* Board name */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+            <button className="tf-navbar-btn" onClick={() => navigate('/boards')} style={{ padding: '0 8px' }}>
+              <ArrowLeft size={14} />
             </button>
-            <button
-              className={`tf-navbar-btn ${viewMode === 'graph' ? 'active' : ''}`}
-              onClick={() => setViewMode('graph')}
-              style={{ borderRadius: 0, border: 'none' }}
+            <h1
+              className="tf-board-title"
+              style={{ fontSize: 16, fontWeight: 650, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
             >
-              <GitBranch size={13} /> Graph
-            </button>
+              {board?.name || 'Board'}
+            </h1>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--col-done)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span className="live-dot" />
+              Live
+            </span>
           </div>
 
-          {canEdit && (
-            <button className="tf-navbar-btn" onClick={() => setShowCalendar(true)}>
-              <CalendarDays size={13} /> Calendar
-            </button>
-          )}
+          {/* Right controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <NavActionGroup token={localStorage.getItem('token')} />
 
-          {canEdit && (
-            <button
-              className="tf-navbar-btn active"
-              onClick={() => openCreateForm(board?.columns?.[0]?._id?.toString())}
-              style={{ fontWeight: 600 }}
-            >
-              <Plus size={14} /> Add Card
-            </button>
-          )}
+            {/* Segmented View toggle */}
+            <div className="segmented-control-track">
+              <button
+                className={`segmented-control-item ${viewMode === 'kanban' ? 'active' : ''}`}
+                onClick={() => setViewMode('kanban')}
+              >
+                <LayoutGrid size={13} style={{ display: 'inline', marginRight: 4 }} /> Board
+              </button>
+              <button
+                className={`segmented-control-item ${viewMode === 'graph' ? 'active' : ''}`}
+                onClick={() => setViewMode('graph')}
+              >
+                <GitBranch size={13} style={{ display: 'inline', marginRight: 4 }} /> Graph
+              </button>
+            </div>
 
-          {/* User avatar */}
-          <OverlayTriggerUser user={user} navigate={navigate} />
+            {canEdit && (
+              <button className="tf-navbar-btn" onClick={() => setShowCalendar(true)}>
+                <CalendarDays size={14} /> Calendar
+              </button>
+            )}
+
+            {canEdit && (
+              <button
+                className="tf-navbar-btn active"
+                onClick={() => openCreateForm(board?.columns?.[0]?._id?.toString())}
+                style={{ fontWeight: 600 }}
+              >
+                <Plus size={15} /> Add Card
+              </button>
+            )}
+
+            {/* User avatar */}
+            <OverlayTriggerUser user={user} navigate={navigate} />
+          </div>
         </div>
       </div>
 

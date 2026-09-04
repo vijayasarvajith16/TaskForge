@@ -3,7 +3,7 @@ const { getDb } = require('../db');
 const { createNotification, existsForTaskLevel } = require('../models/notifications');
 const { findByWorkspace: findUsersByWorkspace } = require('../models/users');
 const { getUserSocketIds } = require('../redis');
-const { notifyWebhook } = require('../utils/webhook');
+const webhookUtil = require('../utils/webhook');
 
 // Escalation thresholds — configurable via env for testing
 const ESCALATION_HOURS = parseInt(process.env.ESCALATION_HOURS || '24', 10);
@@ -74,7 +74,7 @@ async function runEscalation() {
 
         // Fire-and-forget webhook
         if (workspaceId) {
-          notifyWebhook(
+          webhookUtil.notifyWebhook(
             workspaceId,
             `⚠️ *[L1 Escalation]* Task *"${task.title}"* is overdue and has been escalated to the assignee.`,
             { level: 1 }
@@ -116,7 +116,7 @@ async function runEscalation() {
 
             // Fire-and-forget webhook
             if (workspaceId) {
-              notifyWebhook(
+              webhookUtil.notifyWebhook(
                 workspaceId,
                 `🚨 *[L2 Escalation]* Task *"${task.title}"* assigned to *${assigneeName}* is overdue and unresolved — joint heads notified.`,
                 { level: 2 }

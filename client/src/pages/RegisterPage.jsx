@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Alert } from 'react-bootstrap';
-import { Zap } from 'lucide-react';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function RegisterPage() {
   const { registerUser } = useAuth();
@@ -31,21 +31,27 @@ export default function RegisterPage() {
   return (
     <div className="tf-auth-wrapper">
       <div className="tf-auth-card">
-        {/* Logo */}
-        <div className="tf-auth-logo">
-          <img src="/logo.png" alt="TaskForge" style={{ width: 36, height: 36, borderRadius: 8 }} />
-          <span><span style={{ color: 'var(--tf-accent)' }}>Task</span>Forge</span>
+        {/* Header with Logo and ThemeToggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div className="tf-auth-logo" style={{ margin: 0 }}>
+            <img src="/logo.png" alt="TaskForge" style={{ width: 40, height: 40, borderRadius: '30%' }} />
+            <span><span style={{ color: 'var(--tf-accent)' }}>Task</span>Forge</span>
+          </div>
+          <div className="tf-nav-group">
+            <ThemeToggle />
+          </div>
         </div>
-        <p className="tf-auth-subtitle">Create your account — it's free</p>
+        <h2 style={{ fontSize: 28, fontWeight: 650, marginBottom: 4, letterSpacing: '-0.3px' }}>Create account.</h2>
+        <p className="tf-auth-subtitle">Join your team workspace today.</p>
 
         {error && (
-          <Alert variant="danger" className="py-2 mb-3" style={{ fontSize: 13 }}>
+          <Alert variant="danger" className="py-2.5 px-3 mb-4">
             {error}
           </Alert>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 14 }}>
             <label className="form-label">Full Name</label>
             <input
               type="text"
@@ -56,8 +62,8 @@ export default function RegisterPage() {
               placeholder="Jane Smith"
             />
           </div>
-          <div style={{ marginBottom: 12 }}>
-            <label className="form-label">Email</label>
+          <div style={{ marginBottom: 14 }}>
+            <label className="form-label">Email address</label>
             <input
               type="email"
               className="form-control"
@@ -67,7 +73,7 @@ export default function RegisterPage() {
               placeholder="you@example.com"
             />
           </div>
-          <div style={{ marginBottom: 12 }}>
+          <div style={{ marginBottom: 14 }}>
             <label className="form-label">Password</label>
             <input
               type="password"
@@ -79,7 +85,7 @@ export default function RegisterPage() {
               placeholder="Min 6 characters"
             />
           </div>
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 24 }}>
             <label className="form-label">Role</label>
             <select
               className="form-select"
@@ -94,16 +100,16 @@ export default function RegisterPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            style={{ width: '100%', height: 40, fontSize: 14, fontWeight: 600 }}
+            style={{ width: '100%', height: 44, fontSize: 15, fontWeight: 600 }}
             disabled={loading}
           >
             {loading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 
-        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--tf-text-muted)', marginTop: 18, marginBottom: 0 }}>
+        <p style={{ textAlign: 'center', fontSize: 13.5, color: 'var(--tf-text-muted)', marginTop: 24, marginBottom: 0 }}>
           Already have an account?{' '}
-          <Link to="/login" style={{ color: 'var(--tf-accent)', textDecoration: 'none', fontWeight: 500 }}>
+          <Link to="/login" style={{ color: 'var(--tf-ink)', textDecoration: 'underline', fontWeight: 600 }}>
             Sign in
           </Link>
         </p>

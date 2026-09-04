@@ -1,7 +1,8 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 const { v4: uuidv4 } = require('uuid');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { requireWorkspaceMembership } = require('../middleware/requireWorkspaceMembership');
 const {
   createBoard, findByWorkspace, findBoardById, findBoardByCalendarToken,
   updateColumns, updateBoardCalendarToken, deleteBoard,
@@ -15,16 +16,9 @@ const { createEvents } = require('ics');
 const router = express.Router();
 
 // GET /api/boards?workspaceId= — list boards for the workspace
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireWorkspaceMembership(), async (req, res) => {
   try {
-    const { workspaceId } = req.query;
-    if (!workspaceId) return res.status(400).json({ error: 'workspaceId query param required' });
-
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== workspaceId) {
-      return res.status(403).json({ error: 'You do not belong to this workspace' });
-    }
-
-    const boards = await findByWorkspace(workspaceId);
+    const boards = await findByWorkspace(req.workspaceId);
     res.json(boards);
   } catch (err) {
     console.error('Get boards error:', err);
@@ -33,16 +27,12 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/boards — create a new board (head/joint_head only)
-router.post('/', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.post('/', authenticate, requireWorkspaceMembership({ minRole: 'joint_head' }), async (req, res) => {
   try {
-    const { name, workspaceId } = req.body;
-    if (!name || !workspaceId) return res.status(400).json({ error: 'name and workspaceId are required' });
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'name is required' });
 
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== workspaceId) {
-      return res.status(403).json({ error: 'You do not belong to this workspace' });
-    }
-
-    const board = await createBoard({ name, workspaceId });
+    const board = await createBoard({ name, workspaceId: req.workspaceId });
     res.status(201).json(board);
   } catch (err) {
     console.error('Create board error:', err);
@@ -51,20 +41,15 @@ router.post('/', authenticate, authorize('head', 'joint_head'), async (req, res)
 });
 
 // POST /api/boards/from-template — create board from template (head/joint_head only)
-router.post('/from-template', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.post('/from-template', authenticate, requireWorkspaceMembership({ minRole: 'joint_head', fromTemplate: true }), async (req, res) => {
   try {
     const { templateId, eventDate, name } = req.body;
     if (!templateId || !eventDate || !name) {
       return res.status(400).json({ error: 'templateId, eventDate, and name are required' });
     }
 
-    const template = await findTemplateById(templateId);
-    if (!template) return res.status(404).json({ error: 'Template not found' });
-
-    const workspaceId = req.user.workspaceId.toString();
-    if (template.workspaceId.toString() !== workspaceId) {
-      return res.status(403).json({ error: 'Template does not belong to your workspace' });
-    }
+    const template = req.template;
+    const workspaceId = req.workspaceId;
 
     const board = await createBoard({ name, workspaceId, eventDate });
     const boardId = board._id.toString();
@@ -98,29 +83,30 @@ router.post('/from-template', authenticate, authorize('head', 'joint_head'), asy
       });
 
       blueprintToTaskId.set(bp.blueprintId, task._id.toString());
-      createdTasks.push({ task, blueprint: bp });
+      createdTasks.push({ ...task, originalBp: bp });
     }
 
-    const { getDb } = require('../db');
-    const tasksCol = getDb().collection('tasks');
-
-    for (const { task, blueprint } of createdTasks) {
-      if (blueprint.dependsOn && blueprint.dependsOn.length > 0) {
-        const realDeps = blueprint.dependsOn
+    // Pass 2: wire dependencies
+    for (const item of createdTasks) {
+      if (item.originalBp.dependsOnBlueprintIds && item.originalBp.dependsOnBlueprintIds.length > 0) {
+        const realDepIds = item.originalBp.dependsOnBlueprintIds
           .map((bpId) => blueprintToTaskId.get(bpId))
-          .filter(Boolean)
-          .map((id) => new ObjectId(id));
+          .filter(Boolean);
 
-        if (realDeps.length > 0) {
-          await tasksCol.updateOne(
-            { _id: task._id },
-            { $set: { dependsOn: realDeps, updatedAt: new Date() } }
+        if (realDepIds.length > 0) {
+          const { getDb } = require('../db');
+          await getDb().collection('tasks').updateOne(
+            { _id: item._id },
+            { $set: { dependsOn: realDepIds.map((id) => new ObjectId(id)) } }
           );
         }
       }
     }
 
+    // Pass 3: lock any tasks that have unresolved dependencies
     const allTasks = await findByBoard(boardId);
+    const { getDb } = require('../db');
+    const tasksCol = getDb().collection('tasks');
     const bulkOps = [];
     for (const t of allTasks) {
       const newStatus = computeStatus(t, allTasks);
@@ -146,15 +132,12 @@ router.post('/from-template', authenticate, authorize('head', 'joint_head'), asy
 });
 
 // PATCH /api/boards/:id/columns — update columns (head/joint_head only)
-router.patch('/:id/columns', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.patch('/:id/columns', authenticate, requireWorkspaceMembership({ minRole: 'joint_head', fromBoard: true }), async (req, res) => {
   try {
     const { columns } = req.body;
     if (!columns || !Array.isArray(columns)) {
       return res.status(400).json({ error: 'columns array is required' });
     }
-
-    const board = await findBoardById(req.params.id);
-    if (!board) return res.status(404).json({ error: 'Board not found' });
 
     await updateColumns(req.params.id, columns);
     const updated = await findBoardById(req.params.id);
@@ -166,11 +149,8 @@ router.patch('/:id/columns', authenticate, authorize('head', 'joint_head'), asyn
 });
 
 // DELETE /api/boards/:id — delete board and its tasks (head/joint_head only)
-router.delete('/:id', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.delete('/:id', authenticate, requireWorkspaceMembership({ minRole: 'joint_head', fromBoard: true }), async (req, res) => {
   try {
-    const board = await findBoardById(req.params.id);
-    if (!board) return res.status(404).json({ error: 'Board not found' });
-
     await deleteByBoard(req.params.id);
     await deleteBoard(req.params.id);
     res.json({ message: 'Board deleted' });
@@ -183,14 +163,8 @@ router.delete('/:id', authenticate, authorize('head', 'joint_head'), async (req,
 // ── Calendar Feed ─────────────────────────────────────────────────────────────
 
 // POST /api/boards/:id/calendar/token — generate (or regenerate) a calendar token
-router.post('/:id/calendar/token', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.post('/:id/calendar/token', authenticate, requireWorkspaceMembership({ minRole: 'joint_head', fromBoard: true }), async (req, res) => {
   try {
-    const board = await findBoardById(req.params.id);
-    if (!board) return res.status(404).json({ error: 'Board not found' });
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     const token = uuidv4();
     await updateBoardCalendarToken(req.params.id, token);
     res.json({ calendarToken: token });
@@ -201,14 +175,8 @@ router.post('/:id/calendar/token', authenticate, authorize('head', 'joint_head')
 });
 
 // DELETE /api/boards/:id/calendar/token — revoke calendar token
-router.delete('/:id/calendar/token', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.delete('/:id/calendar/token', authenticate, requireWorkspaceMembership({ minRole: 'joint_head', fromBoard: true }), async (req, res) => {
   try {
-    const board = await findBoardById(req.params.id);
-    if (!board) return res.status(404).json({ error: 'Board not found' });
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     await updateBoardCalendarToken(req.params.id, null);
     res.json({ message: 'Calendar token revoked' });
   } catch (err) {
@@ -229,14 +197,8 @@ router.get('/:id/calendar.ics', async (req, res) => {
       return res.status(401).send('Invalid or revoked calendar token');
     }
 
-    // Fetch workspace members for assignee lookup
-    const { getDb } = require('../db');
-    const db = getDb();
-    const members = await db.collection('users')
-      .find({ workspaceId: board.workspaceId })
-      .project({ _id: 1, name: 1 })
-      .toArray();
-
+    // Fetch workspace members via findUsersByWorkspace (which reads memberships)
+    const members = await findUsersByWorkspace(board.workspaceId.toString());
     const memberMap = new Map(members.map((m) => [m._id.toString(), m.name]));
 
     // All non-done tasks with a due date

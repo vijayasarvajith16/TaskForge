@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getWorkload, getLeaderboard } from '../api';
-import NotificationBell from '../components/NotificationBell';
+import NavActionGroup from '../components/NavActionGroup';
+import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { Spinner } from 'react-bootstrap';
 import { BarChart3, Trophy, ArrowLeft, Zap, TrendingUp, CheckSquare, AlertTriangle } from 'lucide-react';
 
@@ -11,28 +12,29 @@ const medals = ['🥇', '🥈', '🥉'];
 function StatCard({ icon, label, value, color }) {
   return (
     <div style={{
-      background: 'var(--tf-col-bg)',
-      border: '1px solid var(--tf-border)',
-      borderRadius: 10,
-      padding: '16px 20px',
+      background: 'var(--tf-canvas-soft)',
+      border: '1px solid var(--tf-hairline-soft)',
+      borderRadius: 24,
+      padding: '20px 24px',
       display: 'flex',
       alignItems: 'center',
-      gap: 14,
-      flex: '1 1 140px',
+      gap: 16,
+      flex: '1 1 180px',
     }}>
       <div style={{
-        width: 40, height: 40, borderRadius: 10,
-        background: `${color}18`,
+        width: 44, height: 44, borderRadius: '30%',
+        background: 'var(--tf-canvas)',
+        border: '1px solid var(--tf-hairline)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
       }}>
         {icon}
       </div>
       <div>
-        <p style={{ fontSize: 22, fontWeight: 700, color: 'var(--tf-text-strong)', margin: 0, lineHeight: 1 }}>
+        <p style={{ fontSize: 26, fontWeight: 650, color: 'var(--tf-ink)', margin: 0, lineHeight: 1 }}>
           {value}
         </p>
-        <p style={{ fontSize: 11.5, color: 'var(--tf-text-muted)', margin: '3px 0 0' }}>{label}</p>
+        <p style={{ fontSize: 13, color: 'var(--tf-text-muted)', margin: '4px 0 0' }}>{label}</p>
       </div>
     </div>
   );
@@ -49,7 +51,7 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user?.workspaceId) { navigate('/workspace'); return; }
     loadData();
-  }, [user]);
+  }, [user?.workspaceId]);
 
   const loadData = async () => {
     try {
@@ -68,24 +70,27 @@ export default function DashboardPage() {
   const maxOpen = Math.max(...workload.map((w) => w.openTasks), 1);
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--tf-bg)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--tf-canvas)', display: 'flex', flexDirection: 'column' }}>
 
-      {/* Navbar */}
-      <div className="tf-navbar">
-        <a className="tf-navbar-brand" style={{ cursor: 'default' }}>
-          <img src="/logo.png" alt="TaskForge" style={{ width: 26, height: 26, borderRadius: 6 }} />
-          <span><span className="tf-brand-blue">Task</span>Forge</span>
-        </a>
+      {/* Floating Navbar */}
+      <div className="tf-navbar-wrapper">
+        <div className="tf-navbar">
+          <a className="tf-navbar-brand" style={{ cursor: 'default' }}>
+            <img src="/logo.png" alt="TaskForge" className="brand-logo" />
+            <span><span className="tf-brand-blue">Task</span>Forge</span>
+          </a>
+          <WorkspaceSwitcher />
 
-        <div style={{ flex: 1 }} />
+          <div style={{ flex: 1 }} />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button className="tf-navbar-btn" onClick={() => navigate('/boards')}>
-            <ArrowLeft size={13} /> Boards
-          </button>
-          <NotificationBell token={localStorage.getItem('token')} />
-          <span style={{ fontSize: 12.5, color: 'var(--tf-text-muted)', padding: '0 4px' }}>{user?.name}</span>
-          <button className="tf-navbar-btn danger" onClick={logout}>Sign out</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="tf-navbar-btn" onClick={() => navigate('/boards')}>
+              <ArrowLeft size={14} /> Boards
+            </button>
+            <NavActionGroup token={localStorage.getItem('token')} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--tf-ink)', padding: '0 4px' }}>{user?.name}</span>
+            <button className="tf-navbar-btn danger" onClick={logout}>Sign out</button>
+          </div>
         </div>
       </div>
 

@@ -102,29 +102,25 @@ export default function NotificationBell({ token }) {
       {/* Dropdown panel */}
       {open && (
         <div style={{
-          position: 'absolute', right: 0, top: 42, zIndex: 300,
-          width: 340, maxHeight: 420,
-          background: 'var(--tf-col-bg)', border: '1px solid var(--tf-border)',
-          borderRadius: 10, boxShadow: 'var(--tf-shadow-lg)',
+          position: 'absolute', right: 0, top: 48, zIndex: 300,
+          width: 360, maxHeight: 440,
+          background: 'var(--tf-canvas)', border: '1px solid var(--tf-hairline)',
+          borderRadius: 16, boxShadow: 'var(--tf-shadow-subtle)',
           animation: 'dropDown 0.15s ease',
           display: 'flex', flexDirection: 'column',
           overflow: 'hidden',
         }}>
           {/* Header */}
           <div style={{
-            padding: '10px 14px',
-            borderBottom: '1px solid var(--tf-border)',
+            padding: '14px 18px',
+            borderBottom: '1px solid var(--tf-hairline-soft)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             flexShrink: 0,
           }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--tf-text-strong)' }}>
+            <span style={{ fontSize: 14, fontWeight: 650, color: 'var(--tf-ink)' }}>
               Notifications
               {unreadCount > 0 && (
-                <span style={{
-                  marginLeft: 8, fontSize: 10, fontWeight: 700,
-                  background: '#ef4444', color: '#fff',
-                  borderRadius: 20, padding: '1px 7px',
-                }}>
+                <span className="tf-badge-popular" style={{ marginLeft: 8 }}>
                   {unreadCount}
                 </span>
               )}
@@ -134,11 +130,11 @@ export default function NotificationBell({ token }) {
                 onClick={handleMarkAllRead}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--tf-accent)', fontSize: 11.5, fontWeight: 500,
+                  color: 'var(--tf-accent)', fontSize: 12, fontWeight: 600,
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}
               >
-                <CheckCheck size={12} /> Mark all read
+                <CheckCheck size={13} /> Mark all read
               </button>
             )}
           </div>
@@ -146,9 +142,9 @@ export default function NotificationBell({ token }) {
           {/* List */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {notifications.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '36px 0', color: 'var(--tf-text-muted)' }}>
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--tf-text-muted)' }}>
                 <Bell size={28} style={{ opacity: 0.3, marginBottom: 8, display: 'block', margin: '0 auto 10px' }} />
-                <p style={{ fontSize: 13, margin: 0 }}>No notifications</p>
+                <p style={{ fontSize: 13.5, margin: 0 }}>No notifications</p>
               </div>
             ) : (
               notifications.map((n) => {
@@ -158,10 +154,10 @@ export default function NotificationBell({ token }) {
                     key={n._id}
                     onClick={() => !n.read && handleMarkRead(n._id)}
                     style={{
-                      display: 'flex', gap: 10, alignItems: 'flex-start',
-                      padding: '10px 14px',
-                      borderBottom: '1px solid var(--tf-border-soft)',
-                      background: n.read ? 'transparent' : 'rgba(87,157,255,0.05)',
+                      display: 'flex', gap: 12, alignItems: 'flex-start',
+                      padding: '12px 18px',
+                      borderBottom: '1px solid var(--tf-hairline-soft)',
+                      background: n.read ? 'transparent' : 'var(--tf-canvas-soft)',
                       cursor: n.read ? 'default' : 'pointer',
                       transition: 'background 0.15s',
                     }}
@@ -170,39 +166,37 @@ export default function NotificationBell({ token }) {
                     <div style={{
                       width: 8, height: 8, borderRadius: '50%',
                       background: LEVEL_COLORS[level] || LEVEL_COLORS[0],
-                      flexShrink: 0, marginTop: 4,
-                      boxShadow: `0 0 6px ${LEVEL_COLORS[level] || LEVEL_COLORS[0]}`,
+                      flexShrink: 0, marginTop: 5,
                     }} />
 
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{
-                        fontSize: 12.5, lineHeight: 1.45, margin: '0 0 3px',
-                        color: n.read ? 'var(--tf-text-muted)' : 'var(--tf-text-strong)',
+                        fontSize: 13, lineHeight: 1.4, margin: '0 0 4px',
+                        color: n.read ? 'var(--tf-text-muted)' : 'var(--tf-ink)',
+                        fontWeight: n.read ? 450 : 600,
                       }}>
                         {cleanMessage(n.message)}
                       </p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span style={{ fontSize: 10.5, color: 'var(--tf-text-muted)' }}>
+                        <span style={{ fontSize: 11, color: 'var(--tf-text-muted)' }}>
                           {formatTime(n.createdAt)}
                         </span>
                         {level === 2 && (
-                          <span style={{
-                            fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20,
-                            background: 'rgba(239,68,68,0.12)', color: '#fc8181',
-                          }}>ESCALATED</span>
+                          <span className="tf-chip overdue" style={{ fontSize: 10, padding: '1px 8px' }}>
+                            ESCALATED
+                          </span>
                         )}
                         {level === 1 && (
-                          <span style={{
-                            fontSize: 9.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20,
-                            background: 'rgba(245,205,71,0.12)', color: '#f5cd47',
-                          }}>OVERDUE</span>
+                          <span className="tf-chip" style={{ fontSize: 10, padding: '1px 8px', background: '#fffbeb', color: '#d97706' }}>
+                            OVERDUE
+                          </span>
                         )}
                       </div>
                     </div>
 
                     {!n.read && (
                       <div style={{
-                        width: 6, height: 6, borderRadius: '50%',
+                        width: 7, height: 7, borderRadius: '50%',
                         background: 'var(--tf-accent)', flexShrink: 0, marginTop: 6,
                       }} />
                     )}

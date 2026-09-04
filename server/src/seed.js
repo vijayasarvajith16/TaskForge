@@ -9,6 +9,7 @@ async function seed() {
 
   // Clean existing data
   await db.collection('users').deleteMany({});
+  await db.collection('memberships').deleteMany({});
   await db.collection('workspaces').deleteMany({});
   await db.collection('boards').deleteMany({});
   await db.collection('tasks').deleteMany({});
@@ -24,8 +25,6 @@ async function seed() {
     name: 'Priya Sharma',
     email: 'head@demo.com',
     passwordHash: hash,
-    role: 'head',
-    workspaceId: null,
     createdAt: new Date(),
   });
 
@@ -33,8 +32,6 @@ async function seed() {
     name: 'Arjun Patel',
     email: 'jh@demo.com',
     passwordHash: hash,
-    role: 'joint_head',
-    workspaceId: null,
     createdAt: new Date(),
   });
 
@@ -42,8 +39,6 @@ async function seed() {
     name: 'Maya Nair',
     email: 'member@demo.com',
     passwordHash: hash,
-    role: 'member',
-    workspaceId: null,
     createdAt: new Date(),
   });
 
@@ -61,11 +56,13 @@ async function seed() {
   });
   const wsId = wsResult.insertedId;
 
-  // Update users with workspaceId
-  await db.collection('users').updateMany(
-    { _id: { $in: [headId, jhId, memberId] } },
-    { $set: { workspaceId: wsId } }
-  );
+  // Create memberships
+  await db.collection('memberships').insertMany([
+    { userId: headId, workspaceId: wsId, role: 'head', joinedAt: new Date() },
+    { userId: jhId, workspaceId: wsId, role: 'joint_head', joinedAt: new Date() },
+    { userId: memberId, workspaceId: wsId, role: 'member', joinedAt: new Date() },
+  ]);
+  await db.collection('memberships').createIndex({ userId: 1, workspaceId: 1 }, { unique: true });
 
   // ─── Board ───────────────────────────────────────
   const col1 = new ObjectId();

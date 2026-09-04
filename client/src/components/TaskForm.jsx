@@ -62,43 +62,42 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
   };
 
   return (
-    <Modal show={show} onHide={onHide} centered contentClassName="bg-dark text-light border-secondary" size="lg">
-      <Modal.Header closeButton closeVariant="white" className="border-secondary">
-        <Modal.Title className="fs-5 fw-bold">{task ? 'Edit Task' : 'New Task'}</Modal.Title>
+    <Modal show={show} onHide={onHide} centered size="lg">
+      <Modal.Header closeButton>
+        <Modal.Title style={{ fontSize: 18, fontWeight: 650, color: 'var(--tf-ink)' }}>
+          {task ? 'Edit Task' : 'New Task'}
+        </Modal.Title>
       </Modal.Header>
-      <Modal.Body>
+      <Modal.Body style={{ padding: 24 }}>
         <Form onSubmit={handleSubmit}>
           <Form.Group className="mb-3">
-            <Form.Label className="small text-secondary">Title</Form.Label>
+            <Form.Label className="form-label">Title</Form.Label>
             <Form.Control
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="bg-dark text-light border-secondary"
               placeholder="Task title"
             />
           </Form.Group>
 
           <Form.Group className="mb-3">
-            <Form.Label className="small text-secondary">Description</Form.Label>
+            <Form.Label className="form-label">Description</Form.Label>
             <Form.Control
               as="textarea"
-              rows={2}
+              rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="bg-dark text-light border-secondary"
               placeholder="Optional details…"
             />
           </Form.Group>
 
           <Row className="mb-3">
             <Col>
-              <Form.Label className="small text-secondary">Column</Form.Label>
+              <Form.Label className="form-label">Column</Form.Label>
               <Form.Select
                 value={columnId}
                 onChange={(e) => setColumnId(e.target.value)}
-                className="bg-dark text-light border-secondary"
               >
                 {columns?.map((c) => (
                   <option key={c._id.toString()} value={c._id.toString()}>
@@ -108,11 +107,10 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
               </Form.Select>
             </Col>
             <Col>
-              <Form.Label className="small text-secondary">Assignee</Form.Label>
+              <Form.Label className="form-label">Assignee</Form.Label>
               <Form.Select
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
-                className="bg-dark text-light border-secondary"
               >
                 <option value="">Unassigned</option>
                 {members?.map((m) => (
@@ -125,33 +123,31 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
           </Row>
 
           <Form.Group className="mb-3">
-            <Form.Label className="small text-secondary">Due Date</Form.Label>
+            <Form.Label className="form-label">Due Date</Form.Label>
             <Form.Control
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="bg-dark text-light border-secondary"
             />
           </Form.Group>
 
           {/* Dependencies multi-select */}
-          <Form.Group className="mb-3">
-            <Form.Label className="small text-secondary">Depends On (must complete before this task unlocks)</Form.Label>
+          <Form.Group className="mb-4">
+            <Form.Label className="form-label">Depends On (prerequisites)</Form.Label>
 
             {/* Selected dependencies */}
             {dependsOn.length > 0 && (
-              <div className="d-flex flex-wrap gap-1 mb-2">
+              <div className="d-flex flex-wrap gap-2 mb-2">
                 {dependsOn.map((depId) => (
-                  <Badge
+                  <span
                     key={depId}
-                    bg="secondary"
-                    className="d-inline-flex align-items-center gap-1 py-1 px-2"
-                    style={{ fontSize: '0.75rem', cursor: 'pointer' }}
+                    className="tf-chip dep"
+                    style={{ cursor: 'pointer' }}
                     onClick={() => removeDependency(depId)}
                   >
                     {getTaskTitle(depId)}
                     <X size={12} />
-                  </Badge>
+                  </span>
                 ))}
               </div>
             )}
@@ -162,8 +158,6 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
               onChange={(e) => {
                 if (e.target.value) addDependency(e.target.value);
               }}
-              className="bg-dark text-light border-secondary"
-              size="sm"
             >
               <option value="">+ Add dependency…</option>
               {availableTasks
@@ -178,7 +172,7 @@ export default function TaskForm({ show, onHide, onSubmit, task, columns, member
 
           <div className="d-flex gap-2 justify-content-end">
             <Button variant="outline-secondary" onClick={onHide}>Cancel</Button>
-            <Button variant="primary" type="submit">{task ? 'Save' : 'Create'}</Button>
+            <Button variant="primary" type="submit">{task ? 'Save Changes' : 'Create Task'}</Button>
           </div>
         </Form>
       </Modal.Body>

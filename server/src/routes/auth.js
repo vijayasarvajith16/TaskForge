@@ -8,20 +8,17 @@ const router = express.Router();
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'name, email and password are required' });
     }
 
-    const validRoles = ['head', 'joint_head', 'member'];
-    const userRole = validRoles.includes(role) ? role : 'member';
-
     const existing = await findByEmail(email);
     if (existing) return res.status(409).json({ error: 'Email already registered' });
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = await createUser({ name, email, passwordHash, role: userRole });
+    const user = await createUser({ name, email, passwordHash });
 
     const token = jwt.sign(
       { userId: user._id.toString() },
@@ -31,7 +28,7 @@ router.post('/register', async (req, res) => {
 
     res.status(201).json({
       token,
-      user: { _id: user._id, name: user.name, email: user.email, role: user.role, workspaceId: user.workspaceId },
+      user: { _id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
     console.error('Register error:', err);
@@ -62,7 +59,7 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: { _id: user._id, name: user.name, email: user.email, role: user.role, workspaceId: user.workspaceId },
+      user: { _id: user._id, name: user.name, email: user.email },
     });
   } catch (err) {
     console.error('Login error:', err);

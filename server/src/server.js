@@ -15,6 +15,7 @@ const taskRoutes = require('./routes/tasks');
 const templateRoutes = require('./routes/templates');
 const notificationRoutes = require('./routes/notifications');
 const pollRoutes = require('./routes/polls');
+const meRoutes = require('./routes/me');
 
 const app = express();
 const server = http.createServer(app);
@@ -51,12 +52,13 @@ app.use('/api/boards', boardRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/me', meRoutes);
 app.use('/api', pollRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
-// Manual escalation trigger (for testing/demo)
+
 app.post('/api/escalation/run', async (_req, res) => {
   try {
     await runEscalation();

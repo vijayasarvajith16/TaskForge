@@ -1,68 +1,58 @@
 const express = require('express');
-const { authenticate, authorize } = require('../middleware/auth');
-const { createTemplate, findByWorkspace, findTemplateById, updateTemplate, deleteTemplate } = require('../models/templates');
+const { authenticate } = require('../middleware/auth');
+const { requireWorkspaceMembership } = require('../middleware/requireWorkspaceMembership');
+const {
+  createTemplate, findByWorkspace, findTemplateById,
+  updateTemplate, deleteTemplate,
+} = require('../models/templates');
 
 const router = express.Router();
 
 /**
- * Validate blueprint dependencies: no self-deps, all refs exist, no cycles.
+ * Validate taskBlueprint array:
+ * - Each item must have blueprintId and title.
+ * - dependsOnBlueprintIds must reference earlier blueprintIds only.
+ * - Returns { valid: boolean, error?: string }
  */
-function validateBlueprint(taskBlueprint) {
-  const ids = new Set(taskBlueprint.map((bp) => bp.blueprintId));
+function validateBlueprint(blueprint) {
+  if (!Array.isArray(blueprint)) return { valid: false, error: 'taskBlueprint must be an array' };
 
-  // Check all dependsOn refs exist and no self-dep
-  for (const bp of taskBlueprint) {
-    for (const depId of bp.dependsOn || []) {
-      if (depId === bp.blueprintId) {
-        return { valid: false, error: `Task "${bp.title}" cannot depend on itself` };
+  const seenIds = new Set();
+
+  for (let i = 0; i < blueprint.length; i++) {
+    const item = blueprint[i];
+
+    if (!item.blueprintId || typeof item.blueprintId !== 'string') {
+      return { valid: false, error: `Item at index ${i} is missing a string blueprintId` };
+    }
+    if (!item.title || typeof item.title !== 'string') {
+      return { valid: false, error: `Item at index ${i} is missing a title` };
+    }
+    if (seenIds.has(item.blueprintId)) {
+      return { valid: false, error: `Duplicate blueprintId: ${item.blueprintId}` };
+    }
+
+    if (item.dependsOnBlueprintIds && Array.isArray(item.dependsOnBlueprintIds)) {
+      for (const depId of item.dependsOnBlueprintIds) {
+        if (!seenIds.has(depId)) {
+          return {
+            valid: false,
+            error: `Task "${item.blueprintId}" depends on "${depId}", which is not declared before it`,
+          };
+        }
       }
-      if (!ids.has(depId)) {
-        return { valid: false, error: `Task "${bp.title}" depends on unknown blueprint entry "${depId}"` };
-      }
     }
-  }
 
-  // Cycle detection via DFS
-  const adjMap = new Map();
-  for (const bp of taskBlueprint) {
-    adjMap.set(bp.blueprintId, bp.dependsOn || []);
-  }
-
-  const visited = new Set();
-  const inStack = new Set();
-
-  function hasCycle(nodeId) {
-    if (inStack.has(nodeId)) return true;
-    if (visited.has(nodeId)) return false;
-    visited.add(nodeId);
-    inStack.add(nodeId);
-    for (const dep of adjMap.get(nodeId) || []) {
-      if (hasCycle(dep)) return true;
-    }
-    inStack.delete(nodeId);
-    return false;
-  }
-
-  for (const bp of taskBlueprint) {
-    if (hasCycle(bp.blueprintId)) {
-      return { valid: false, error: 'Blueprint contains a circular dependency' };
-    }
+    seenIds.add(item.blueprintId);
   }
 
   return { valid: true };
 }
 
 // GET /api/templates?workspaceId= — list templates for workspace
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireWorkspaceMembership(), async (req, res) => {
   try {
-    const { workspaceId } = req.query;
-    if (!workspaceId) return res.status(400).json({ error: 'workspaceId query param required' });
-
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== workspaceId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    const templates = await findByWorkspace(workspaceId);
+    const templates = await findByWorkspace(req.workspaceId);
     res.json(templates);
   } catch (err) {
     console.error('Get templates error:', err);
@@ -71,15 +61,11 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // POST /api/templates — create a template (head/joint_head only)
-router.post('/', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.post('/', authenticate, requireWorkspaceMembership({ minRole: 'joint_head' }), async (req, res) => {
   try {
-    const { workspaceId, name, taskBlueprint } = req.body;
-    if (!workspaceId || !name) {
-      return res.status(400).json({ error: 'workspaceId and name are required' });
-    }
-
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== workspaceId) {
-      return res.status(403).json({ error: 'Access denied' });
+    const { name, taskBlueprint } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' });
     }
 
     if (taskBlueprint && taskBlueprint.length > 0) {
@@ -89,7 +75,7 @@ router.post('/', authenticate, authorize('head', 'joint_head'), async (req, res)
       }
     }
 
-    const template = await createTemplate({ workspaceId, name, taskBlueprint: taskBlueprint || [] });
+    const template = await createTemplate({ workspaceId: req.workspaceId, name, taskBlueprint: taskBlueprint || [] });
     res.status(201).json(template);
   } catch (err) {
     console.error('Create template error:', err);
@@ -98,15 +84,8 @@ router.post('/', authenticate, authorize('head', 'joint_head'), async (req, res)
 });
 
 // PATCH /api/templates/:id — update a template (head/joint_head only)
-router.patch('/:id', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.patch('/:id', authenticate, requireWorkspaceMembership({ minRole: 'joint_head', fromTemplate: true }), async (req, res) => {
   try {
-    const template = await findTemplateById(req.params.id);
-    if (!template) return res.status(404).json({ error: 'Template not found' });
-
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== template.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     const updates = {};
     if (req.body.name !== undefined) updates.name = req.body.name;
     if (req.body.taskBlueprint !== undefined) {
@@ -126,15 +105,8 @@ router.patch('/:id', authenticate, authorize('head', 'joint_head'), async (req, 
 });
 
 // DELETE /api/templates/:id — delete a template (head/joint_head only)
-router.delete('/:id', authenticate, authorize('head', 'joint_head'), async (req, res) => {
+router.delete('/:id', authenticate, requireWorkspaceMembership({ minRole: 'joint_head', fromTemplate: true }), async (req, res) => {
   try {
-    const template = await findTemplateById(req.params.id);
-    if (!template) return res.status(404).json({ error: 'Template not found' });
-
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== template.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
     await deleteTemplate(req.params.id);
     res.json({ message: 'Template deleted' });
   } catch (err) {

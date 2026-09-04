@@ -150,11 +150,11 @@ export default function DependencyGraph({ tasks }) {
   }
 
   return (
-    <div ref={containerRef} style={{ overflow: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
+    <div ref={containerRef} style={{ overflow: 'auto', maxHeight: 'calc(100vh - 140px)', padding: 12 }}>
       <svg
         width={width}
         height={height}
-        style={{ backgroundColor: 'rgba(15, 15, 25, 0.5)', borderRadius: 8 }}
+        style={{ backgroundColor: 'var(--tf-canvas-soft)', borderRadius: 24, border: '1px solid var(--tf-hairline-soft)' }}
       >
         <defs>
           {/* Arrowhead marker */}
@@ -165,7 +165,7 @@ export default function DependencyGraph({ tasks }) {
             refX="10"
             refY="3.5"
             orient="auto"
-            fill="#6366f1"
+            fill="var(--tf-accent)"
           >
             <polygon points="0 0, 10 3.5, 0 7" />
           </marker>
@@ -176,7 +176,7 @@ export default function DependencyGraph({ tasks }) {
             refX="10"
             refY="3.5"
             orient="auto"
-            fill="#10b981"
+            fill="var(--col-done)"
           >
             <polygon points="0 0, 10 3.5, 0 7" />
           </marker>
@@ -195,9 +195,9 @@ export default function DependencyGraph({ tasks }) {
               key={i}
               d={`M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`}
               fill="none"
-              stroke={edge.isDone ? '#10b981' : '#6366f1'}
+              stroke={edge.isDone ? 'var(--col-done)' : 'var(--tf-accent)'}
               strokeWidth={2}
-              strokeOpacity={0.6}
+              strokeOpacity={0.7}
               markerEnd={edge.isDone ? 'url(#arrowhead-done)' : 'url(#arrowhead)'}
             />
           );
@@ -205,7 +205,7 @@ export default function DependencyGraph({ tasks }) {
 
         {/* Nodes */}
         {nodes.map((node) => {
-          const color = STATUS_COLORS[node.task.status] || '#6b7280';
+          const color = STATUS_COLORS[node.task.status] || '#707070';
           const isHovered = hoveredNode === node.id;
 
           return (
@@ -221,17 +221,16 @@ export default function DependencyGraph({ tasks }) {
                 y={node.y}
                 width={node.w}
                 height={node.h}
-                rx={8}
-                ry={8}
-                fill={isHovered ? 'rgba(40, 40, 60, 0.95)' : 'rgba(30, 30, 46, 0.9)'}
-                stroke={color}
-                strokeWidth={isHovered ? 2 : 1.5}
-                strokeOpacity={isHovered ? 1 : 0.7}
+                rx={16}
+                ry={16}
+                fill="var(--tf-canvas)"
+                stroke={isHovered ? 'var(--tf-ink)' : 'var(--tf-hairline)'}
+                strokeWidth={isHovered ? 2 : 1}
               />
 
               {/* Status indicator dot */}
               <circle
-                cx={node.x + 14}
+                cx={node.x + 18}
                 cy={node.y + node.h / 2}
                 r={5}
                 fill={color}
@@ -239,22 +238,23 @@ export default function DependencyGraph({ tasks }) {
 
               {/* Task title (truncated) */}
               <text
-                x={node.x + 26}
-                y={node.y + 26}
-                fill="#e0e0e0"
-                fontSize={12}
-                fontWeight={600}
+                x={node.x + 32}
+                y={node.y + 28}
+                fill="var(--tf-ink)"
+                fontSize={13}
+                fontWeight={650}
                 fontFamily="Inter, sans-serif"
               >
-                {node.task.title.length > 24 ? node.task.title.slice(0, 24) + '…' : node.task.title}
+                {node.task.title.length > 22 ? node.task.title.slice(0, 22) + '…' : node.task.title}
               </text>
 
               {/* Status label */}
               <text
-                x={node.x + 26}
+                x={node.x + 32}
                 y={node.y + 46}
                 fill={color}
-                fontSize={10}
+                fontSize={11}
+                fontWeight={600}
                 fontFamily="Inter, sans-serif"
                 textTransform="capitalize"
               >

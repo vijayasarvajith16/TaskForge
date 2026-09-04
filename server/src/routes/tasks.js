@@ -1,5 +1,7 @@
 const express = require('express');
+const { ObjectId } = require('mongodb');
 const { authenticate } = require('../middleware/auth');
+const { requireWorkspaceMembership } = require('../middleware/requireWorkspaceMembership');
 const { createTask, findByBoard, findTaskById, updateTask, bulkUpdateStatus, deleteTask } = require('../models/tasks');
 const { findBoardById } = require('../models/boards');
 const { computeStatus, findDirectDependents, validateDependencies } = require('../utils/dependencies');
@@ -11,18 +13,9 @@ const { notifyWebhook } = require('../utils/webhook');
 const router = express.Router();
 
 // GET /api/tasks?boardId= — list all tasks for a board
-router.get('/', authenticate, async (req, res) => {
+router.get('/', authenticate, requireWorkspaceMembership({ fromBoard: true }), async (req, res) => {
   try {
-    const { boardId } = req.query;
-    if (!boardId) return res.status(400).json({ error: 'boardId query param required' });
-
-    const board = await findBoardById(boardId);
-    if (!board) return res.status(404).json({ error: 'Board not found' });
-
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
+    const boardId = req.query.boardId;
     const tasks = await findByBoard(boardId);
     res.json(tasks);
   } catch (err) {
@@ -32,11 +25,9 @@ router.get('/', authenticate, async (req, res) => {
 });
 
 // GET /api/tasks/:id/detail — get task detail with activity log and comments
-router.get('/:id/detail', authenticate, async (req, res) => {
+router.get('/:id/detail', authenticate, requireWorkspaceMembership({ fromTask: true }), async (req, res) => {
   try {
-    const task = await findTaskById(req.params.id);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-
+    const task = req.task;
     const [activity, comments] = await Promise.all([
       findActivityByTask(req.params.id),
       findCommentsByTask(req.params.id),
@@ -50,7 +41,7 @@ router.get('/:id/detail', authenticate, async (req, res) => {
 });
 
 // GET /api/tasks/:id/activity — activity feed for a task
-router.get('/:id/activity', authenticate, async (req, res) => {
+router.get('/:id/activity', authenticate, requireWorkspaceMembership({ fromTask: true }), async (req, res) => {
   try {
     const activity = await findActivityByTask(req.params.id);
     res.json(activity);
@@ -61,13 +52,12 @@ router.get('/:id/activity', authenticate, async (req, res) => {
 });
 
 // POST /api/tasks/:id/comments — add a comment
-router.post('/:id/comments', authenticate, async (req, res) => {
+router.post('/:id/comments', authenticate, requireWorkspaceMembership({ fromTask: true }), async (req, res) => {
   try {
     const { text } = req.body;
     if (!text || !text.trim()) return res.status(400).json({ error: 'Comment text is required' });
 
-    const task = await findTaskById(req.params.id);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const task = req.task;
 
     const comment = await createComment({
       taskId: req.params.id,
@@ -99,7 +89,7 @@ router.post('/:id/comments', authenticate, async (req, res) => {
 });
 
 // POST /api/tasks — create a task
-router.post('/', authenticate, async (req, res) => {
+router.post('/', authenticate, requireWorkspaceMembership({ fromBoard: true }), async (req, res) => {
   try {
     const { boardId, columnId, title, description, assignedTo, dueDate, dependsOn } = req.body;
 
@@ -107,14 +97,7 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'boardId, columnId, and title are required' });
     }
 
-    const board = await findBoardById(boardId);
-    if (!board) return res.status(404).json({ error: 'Board not found' });
-
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    if (req.user.role === 'member' && assignedTo && assignedTo !== req.user._id.toString()) {
+    if (req.membership.role === 'member' && assignedTo && assignedTo !== req.user._id.toString()) {
       return res.status(403).json({ error: 'Members can only create tasks assigned to themselves' });
     }
 
@@ -142,30 +125,28 @@ router.post('/', authenticate, async (req, res) => {
 
     if (assignedTo) {
       const assignee = await findUserById(assignedTo);
-      if (assignee) {
-        await logActivity({
-          taskId: task._id.toString(),
-          userId: req.user._id.toString(),
-          action: 'assigned',
-          detail: `${req.user.name} assigned this to ${assignee.name}`,
-        });
-      }
+      await logActivity({
+        taskId: task._id.toString(),
+        userId: req.user._id.toString(),
+        action: 'assigned',
+        detail: `Assigned to ${assignee?.name || 'someone'}`,
+      });
     }
 
-    // If the task has dependencies, compute its initial status
+    // Dependency check: lock if any dependency is not done
     if (validatedDeps.length > 0) {
       const allTasks = await findByBoard(boardId);
       const status = computeStatus(task, allTasks);
       if (status !== task.status) {
-        const updated = await updateTask(task._id.toString(), { status });
-        const io = req.app.get('io');
-        io.to(boardId).emit('task_created', { task: updated });
-        return res.status(201).json(updated);
+        await updateTask(task._id.toString(), { status });
+        task.status = status;
       }
     }
 
+    // Broadcast via Socket.io
     const io = req.app.get('io');
     io.to(boardId).emit('task_created', { task });
+
     res.status(201).json(task);
   } catch (err) {
     console.error('Create task error:', err);
@@ -173,24 +154,19 @@ router.post('/', authenticate, async (req, res) => {
   }
 });
 
-// PATCH /api/tasks/:id/move — move a task to a different column/position
-router.patch('/:id/move', authenticate, async (req, res) => {
+// PATCH /api/tasks/:id/move — move task to a different column/order
+router.patch('/:id/move', authenticate, requireWorkspaceMembership({ fromTask: true }), async (req, res) => {
   try {
     const { columnId, order } = req.body;
     if (!columnId || order === undefined) {
       return res.status(400).json({ error: 'columnId and order are required' });
     }
 
-    const task = await findTaskById(req.params.id);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const task = req.task;
+    const board = req.board;
 
     if (task.status === 'locked') {
       return res.status(400).json({ error: 'Locked tasks cannot be moved' });
-    }
-
-    const board = await findBoardById(task.boardId.toString());
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
     }
 
     const oldColId = task.columnId.toString();
@@ -225,10 +201,10 @@ router.patch('/:id/move', authenticate, async (req, res) => {
 });
 
 // PATCH /api/tasks/:id/complete — mark task as done and unlock dependents
-router.patch('/:id/complete', authenticate, async (req, res) => {
+router.patch('/:id/complete', authenticate, requireWorkspaceMembership({ fromTask: true }), async (req, res) => {
   try {
-    const task = await findTaskById(req.params.id);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const task = req.task;
+    const board = req.board;
 
     if (task.status === 'locked') {
       return res.status(400).json({ error: 'Cannot complete a locked task' });
@@ -238,12 +214,7 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
       return res.json(task);
     }
 
-    const board = await findBoardById(task.boardId.toString());
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    if (req.user.role === 'member' && task.assignedTo && task.assignedTo.toString() !== req.user._id.toString()) {
+    if (req.membership.role === 'member' && task.assignedTo && task.assignedTo.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: 'Members can only complete tasks assigned to them' });
     }
 
@@ -259,41 +230,51 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
       detail: `${req.user.name} marked this as done`,
     });
 
-    // Fire-and-forget webhook notification
+    // Fire webhook for completion
     const workspaceId = board.workspaceId?.toString();
     if (workspaceId) {
-      const assigneeName = completedTask.assignedTo
-        ? (await findUserById(completedTask.assignedTo.toString()).catch(() => null))?.name || 'Unknown'
-        : 'Unassigned';
       notifyWebhook(
         workspaceId,
-        `✅ Task *"${completedTask.title}"* completed by *${req.user.name}*` +
-          (assigneeName !== 'Unassigned' ? ` (assigned to ${assigneeName})` : ''),
-        { color: 'success' }
+        `✅ *${req.user.name}* completed *"${task.title}"* on board *"${board.name}"*`,
+        { level: 0, boardId, taskId: req.params.id }
       );
     }
 
+    // Check direct dependents
     const allTasks = await findByBoard(boardId);
     const dependents = findDirectDependents(req.params.id, allTasks);
-    const unlockedIds = [];
 
-    const statusUpdates = [];
+    const unlockedIds = [];
     for (const dep of dependents) {
-      const newStatus = computeStatus(dep, allTasks);
-      if (newStatus !== dep.status) {
-        statusUpdates.push({ taskId: dep._id.toString(), status: newStatus });
-        if (dep.status === 'locked' && newStatus !== 'locked') {
-          unlockedIds.push(dep._id.toString());
-        }
+      const otherDeps = (dep.dependsOn || []).filter((d) => d.toString() !== req.params.id);
+      const allOthersDone = otherDeps.every((dId) => {
+        const dTask = allTasks.find((t) => t._id.toString() === dId.toString());
+        return dTask && dTask.status === 'done';
+      });
+      if (allOthersDone && dep.status === 'locked') {
+        unlockedIds.push(dep._id.toString());
       }
     }
 
-    if (statusUpdates.length > 0) {
-      await bulkUpdateStatus(statusUpdates);
+    if (unlockedIds.length > 0) {
+      await bulkUpdateStatus(unlockedIds, 'todo');
+
+      for (const uId of unlockedIds) {
+        await logActivity({
+          taskId: uId,
+          userId: req.user._id.toString(),
+          action: 'unlocked',
+          detail: `Unlocked automatically because "${task.title}" was completed`,
+        });
+      }
     }
 
+    // Broadcast via Socket.io
     const io = req.app.get('io');
-    io.to(boardId).emit('task_updated', { task: completedTask });
+    io.to(boardId).emit('task_completed', {
+      taskId: req.params.id,
+      task: completedTask,
+    });
 
     if (unlockedIds.length > 0) {
       const updatedAll = await findByBoard(boardId);
@@ -315,17 +296,11 @@ router.patch('/:id/complete', authenticate, async (req, res) => {
 });
 
 // PATCH /api/tasks/:id — update a task
-router.patch('/:id', authenticate, async (req, res) => {
+router.patch('/:id', authenticate, requireWorkspaceMembership({ fromTask: true }), async (req, res) => {
   try {
-    const task = await findTaskById(req.params.id);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const task = req.task;
 
-    const board = await findBoardById(task.boardId.toString());
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    if (req.user.role === 'member' && task.assignedTo && task.assignedTo.toString() !== req.user._id.toString()) {
+    if (req.membership.role === 'member' && task.assignedTo && task.assignedTo.toString() !== req.user._id.toString()) {
       return res.status(403).json({ error: 'Members can only edit tasks assigned to them' });
     }
 
@@ -394,20 +369,9 @@ router.patch('/:id', authenticate, async (req, res) => {
 });
 
 // DELETE /api/tasks/:id — delete a task
-router.delete('/:id', authenticate, async (req, res) => {
+router.delete('/:id', authenticate, requireWorkspaceMembership({ minRole: 'joint_head', fromTask: true }), async (req, res) => {
   try {
-    const task = await findTaskById(req.params.id);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
-
-    const board = await findBoardById(task.boardId.toString());
-    if (!req.user.workspaceId || req.user.workspaceId.toString() !== board.workspaceId.toString()) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-
-    if (req.user.role === 'member') {
-      return res.status(403).json({ error: 'Only head or joint_head can delete tasks' });
-    }
-
+    const task = req.task;
     const boardId = task.boardId.toString();
     const taskId = task._id.toString();
 

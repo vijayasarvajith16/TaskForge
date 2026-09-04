@@ -2,11 +2,11 @@ import { OverlayTrigger, Tooltip } from 'react-bootstrap';
 import { Calendar, Lock, CheckCircle, Edit2, Trash2, Link2 } from 'lucide-react';
 
 const STATUS_COLORS = {
-  open:        { bg: 'rgba(87,157,255,0.15)',  color: 'var(--col-todo)',       label: 'Open' },
-  in_progress: { bg: 'rgba(96,198,210,0.15)',  color: 'var(--col-inprogress)', label: 'In Progress' },
-  blocked:     { bg: 'rgba(245,205,71,0.15)',   color: 'var(--col-blocked)',    label: 'Blocked' },
-  done:        { bg: 'rgba(75,206,151,0.15)',   color: 'var(--col-done)',       label: 'Done' },
-  locked:      { bg: 'rgba(115,132,150,0.15)', color: 'var(--tf-text-muted)',  label: 'Locked' },
+  open:        { bg: '#eff6ff', color: 'var(--col-todo)',       label: 'Open' },
+  in_progress: { bg: '#f0f9ff', color: 'var(--col-inprogress)', label: 'In Progress' },
+  blocked:     { bg: '#fffbeb', color: 'var(--col-blocked)',    label: 'Blocked' },
+  done:        { bg: '#f0fdf4', color: 'var(--col-done)',       label: 'Done' },
+  locked:      { bg: '#f3f3f3', color: 'var(--tf-text-muted)',  label: 'Locked' },
 };
 
 function initials(name) {

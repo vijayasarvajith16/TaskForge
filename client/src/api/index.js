@@ -4,16 +4,24 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
-// Attach JWT to every request
+// Attach JWT and active workspace header to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  const currentWorkspaceId = localStorage.getItem('currentWorkspaceId');
+  if (currentWorkspaceId) {
+    config.headers['x-workspace-id'] = currentWorkspaceId;
+  }
   return config;
 });
 
 // ─── Auth ──────────────────────────────────────────
 export const register = (data) => api.post('/auth/register', data);
 export const login = (data) => api.post('/auth/login', data);
+
+// ─── Me / User Workspaces ──────────────────────────
+export const getMyWorkspaces = () => api.get('/me/workspaces');
 
 // ─── Workspaces ────────────────────────────────────
 export const createWorkspace = (data) => api.post('/workspaces', data);

@@ -8,21 +8,22 @@ import {
 } from '../api';
 import TemplateEditor from '../components/TemplateEditor';
 import CreateFromTemplate from '../components/CreateFromTemplate';
-import NotificationBell from '../components/NotificationBell';
+import NavActionGroup from '../components/NavActionGroup';
+import WorkspaceSwitcher from '../components/WorkspaceSwitcher';
 import { Spinner, Alert } from 'react-bootstrap';
 import {
   LayoutDashboard, Plus, Trash2, LogOut, Users, FileText,
   Edit2, Copy, BarChart3, Calendar, Zap, ChevronRight,
 } from 'lucide-react';
 
-// Board cover gradients — cycles through a palette
+// Board cover gradients — Mobbin monochrome tint ladder
 const COVER_GRADIENTS = [
-  'linear-gradient(135deg,#1e3a5f 0%,#0f2340 100%)',
-  'linear-gradient(135deg,#1a3a2a 0%,#0f2318 100%)',
-  'linear-gradient(135deg,#3a1a2a 0%,#230f18 100%)',
-  'linear-gradient(135deg,#2a2a1a 0%,#1a1a0f 100%)',
-  'linear-gradient(135deg,#1a1a3a 0%,#0f0f23 100%)',
-  'linear-gradient(135deg,#2a1a1a 0%,#1a0f0f 100%)',
+  'linear-gradient(135deg, #f3f3f3 0%, #e0e0e0 100%)',
+  'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)',
+  'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+  'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+  'linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%)',
+  'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
 ];
 
 function getBoardGradient(id) {
@@ -58,7 +59,7 @@ export default function BoardsPage() {
     if (!user?.workspaceId) { navigate('/workspace'); return; }
     loadData();
     if (!workspace) refreshWorkspace();
-  }, [user]);
+  }, [user?.workspaceId]);
 
   const loadData = async () => {
     try {
@@ -130,47 +131,50 @@ export default function BoardsPage() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--tf-bg)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--tf-canvas)', display: 'flex', flexDirection: 'column' }}>
 
-      {/* ── Trello-style top navbar ── */}
-      <div className="tf-navbar">
-        <a className="tf-navbar-brand" style={{ cursor: 'default' }}>
-          <img src="/logo.png" alt="TaskForge" style={{ width: 26, height: 26, borderRadius: 6 }} />
-          <span><span className="tf-brand-blue">Task</span>Forge</span>
-        </a>
+      {/* ── Mobbin Floating Nav Pill ── */}
+      <div className="tf-navbar-wrapper">
+        <div className="tf-navbar">
+          <a className="tf-navbar-brand" style={{ cursor: 'default' }}>
+            <img src="/logo.png" alt="TaskForge" className="brand-logo" />
+            <span><span className="tf-brand-blue">Task</span>Forge</span>
+          </a>
+          <WorkspaceSwitcher />
 
-        {/* Tab strip */}
-        <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-          {[
-            { key: 'boards', icon: <LayoutDashboard size={13} />, label: 'Boards' },
-            ...(canManage ? [{ key: 'templates', icon: <FileText size={13} />, label: 'Templates' }] : []),
-          ].map(({ key, icon, label }) => (
-            <button
-              key={key}
-              className={`tf-navbar-btn ${activeTab === key ? 'active' : ''}`}
-              onClick={() => setActiveTab(key)}
-            >
-              {icon} {label}
+          {/* Tab strip */}
+          <div style={{ display: 'flex', gap: 4, flex: 1 }}>
+            {[
+              { key: 'boards', icon: <LayoutDashboard size={14} />, label: 'Boards' },
+              ...(canManage ? [{ key: 'templates', icon: <FileText size={14} />, label: 'Templates' }] : []),
+            ].map(({ key, icon, label }) => (
+              <button
+                key={key}
+                className={`tf-navbar-btn ${activeTab === key ? 'active' : ''}`}
+                onClick={() => setActiveTab(key)}
+              >
+                {icon} {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Right side */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button className="tf-navbar-btn" onClick={() => navigate('/dashboard')}>
+              <BarChart3 size={14} /> Dashboard
             </button>
-          ))}
-        </div>
-
-        {/* Right side */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button className="tf-navbar-btn" onClick={() => navigate('/dashboard')}>
-            <BarChart3 size={13} /> Dashboard
-          </button>
-          <button className="tf-navbar-btn" onClick={() => navigate('/workspace')}>
-            <Users size={13} /> Workspace
-          </button>
-          <NotificationBell token={localStorage.getItem('token')} />
-          {/* Avatar */}
-          <div
-            className="tf-avatar"
-            title={`${user?.name} • ${user?.role?.replace('_', ' ')}`}
-            onClick={logout}
-          >
-            {user?.name ? initials(user.name) : '?'}
+            <button className="tf-navbar-btn" onClick={() => navigate('/workspace')}>
+              <Users size={14} /> Workspace
+            </button>
+            <NavActionGroup token={localStorage.getItem('token')} />
+            {/* Avatar */}
+            <div
+              className="tf-avatar"
+              title={`${user?.name} • ${user?.role?.replace('_', ' ')}`}
+              onClick={logout}
+            >
+              {user?.name ? initials(user.name) : '?'}
+            </div>
           </div>
         </div>
       </div>

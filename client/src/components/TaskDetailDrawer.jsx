@@ -97,97 +97,99 @@ export default function TaskDetailDrawer({ show, onHide, taskId, members, socket
   };
 
   return (
-    <Offcanvas show={show} onHide={onHide} placement="end" className="bg-dark text-light border-secondary" style={{ width: 440 }}>
-      <Offcanvas.Header closeButton closeVariant="white" className="border-bottom border-secondary pb-2">
-        <Offcanvas.Title className="fs-6 fw-bold">Task Details</Offcanvas.Title>
+    <Offcanvas show={show} onHide={onHide} placement="end" style={{ width: 440, borderLeft: '1px solid var(--tf-hairline)' }}>
+      <Offcanvas.Header closeButton style={{ padding: '20px 24px', borderBottom: '1px solid var(--tf-hairline-soft)' }}>
+        <Offcanvas.Title style={{ fontSize: 18, fontWeight: 650, color: 'var(--tf-ink)' }}>Task Details</Offcanvas.Title>
       </Offcanvas.Header>
       <Offcanvas.Body className="d-flex flex-column p-0">
         {loading ? (
-          <div className="text-center py-5"><Spinner animation="border" variant="primary" size="sm" /></div>
+          <div className="text-center py-5"><Spinner animation="border" style={{ color: 'var(--tf-ink)' }} size="sm" /></div>
         ) : !task ? (
-          <div className="text-center text-secondary py-5">Task not found</div>
+          <div className="text-center text-muted py-5">Task not found</div>
         ) : (
           <>
             {/* Task info */}
-            <div className="px-3 py-3 border-bottom border-secondary">
-              <h6 className="fw-bold mb-2">{task.title}</h6>
-              {task.description && <p className="text-secondary small mb-2">{task.description}</p>}
-              <div className="d-flex flex-wrap gap-2 mb-2">
-                <Badge bg={statusColors[task.status] || 'secondary'} className="text-capitalize">
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--tf-hairline-soft)' }}>
+              <h5 style={{ fontSize: 18, fontWeight: 650, color: 'var(--tf-ink)', marginBottom: 8 }}>{task.title}</h5>
+              {task.description && <p style={{ fontSize: 13.5, color: 'var(--tf-text-muted)', marginBottom: 14 }}>{task.description}</p>}
+              <div className="d-flex flex-wrap gap-2 mb-3">
+                <span className="tf-chip" style={{ textTransform: 'capitalize' }}>
                   {task.status?.replace('_', ' ')}
-                </Badge>
+                </span>
                 {task.escalationLevel > 0 && (
-                  <Badge bg={task.escalationLevel >= 2 ? 'danger' : 'warning'} text={task.escalationLevel >= 2 ? undefined : 'dark'}>
+                  <span className="tf-chip overdue">
                     Escalation L{task.escalationLevel}
-                  </Badge>
+                  </span>
                 )}
               </div>
-              <div className="small text-secondary d-flex flex-column gap-1">
-                <span><User size={12} className="me-1" /> {getAssigneeName()}</span>
+              <div style={{ fontSize: 13, color: 'var(--tf-text-muted)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <span><User size={13} className="me-1" /> Assignee: <strong>{getAssigneeName()}</strong></span>
                 {task.dueDate && (
-                  <span><Clock size={12} className="me-1" /> Due: {new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                  <span><Clock size={13} className="me-1" /> Due: <strong>{new Date(task.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</strong></span>
                 )}
                 {task.dependsOn?.length > 0 && (
-                  <span><Link2 size={12} className="me-1" /> {task.dependsOn.length} dependenc{task.dependsOn.length > 1 ? 'ies' : 'y'}</span>
+                  <span><Link2 size={13} className="me-1" /> Dependencies: <strong>{task.dependsOn.length} item{(task.dependsOn.length > 1 ? 's' : '')}</strong></span>
                 )}
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="d-flex border-bottom border-secondary">
-              <button
-                className={`btn btn-sm flex-fill rounded-0 border-0 ${tab === 'activity' ? 'text-primary border-bottom border-primary' : 'text-secondary'}`}
-                style={{ borderBottom: tab === 'activity' ? '2px solid' : 'none' }}
-                onClick={() => setTab('activity')}
-              >
-                <Activity size={13} className="me-1" /> Activity
-              </button>
-              <button
-                className={`btn btn-sm flex-fill rounded-0 border-0 ${tab === 'comments' ? 'text-primary border-bottom border-primary' : 'text-secondary'}`}
-                style={{ borderBottom: tab === 'comments' ? '2px solid' : 'none' }}
-                onClick={() => setTab('comments')}
-              >
-                <MessageSquare size={13} className="me-1" /> Comments ({comments.length})
-              </button>
+            {/* Segmented Control Tabs */}
+            <div style={{ padding: '12px 24px', borderBottom: '1px solid var(--tf-hairline-soft)' }}>
+              <div className="segmented-control-track" style={{ width: '100%' }}>
+                <button
+                  className={`segmented-control-item ${tab === 'activity' ? 'active' : ''}`}
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={() => setTab('activity')}
+                >
+                  <Activity size={13} className="me-1" /> Activity
+                </button>
+                <button
+                  className={`segmented-control-item ${tab === 'comments' ? 'active' : ''}`}
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={() => setTab('comments')}
+                >
+                  <MessageSquare size={13} className="me-1" /> Comments ({comments.length})
+                </button>
+              </div>
             </div>
 
             {/* Content */}
-            <div className="flex-grow-1" style={{ overflowY: 'auto', minHeight: 0 }}>
+            <div className="flex-grow-1" style={{ overflowY: 'auto', minHeight: 0, padding: '16px 24px' }}>
               {tab === 'activity' ? (
-                <div className="px-3 py-2">
+                <div>
                   {activity.length === 0 ? (
-                    <p className="text-secondary small text-center py-3">No activity yet</p>
+                    <p className="text-muted small text-center py-4">No activity yet</p>
                   ) : (
                     activity.map((a, i) => (
-                      <div key={a._id?.toString() || i} className="d-flex gap-2 py-2 border-bottom border-secondary" style={{ fontSize: '0.78rem' }}>
+                      <div key={a._id?.toString() || i} className="d-flex gap-3 py-2 border-bottom border-light" style={{ fontSize: '0.85rem' }}>
                         <div
                           style={{
-                            width: 6, height: 6, borderRadius: '50%', flexShrink: 0, marginTop: 6,
-                            backgroundColor: a.action === 'completed' ? '#22c55e' : a.action === 'commented' ? '#6366f1' : a.action === 'moved' ? '#f59e0b' : '#64748b',
+                            width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 6,
+                            backgroundColor: a.action === 'completed' ? '#16a34a' : a.action === 'commented' ? '#0066ff' : a.action === 'moved' ? '#d97706' : '#707070',
                           }}
                         />
                         <div>
-                          <span className="text-light">{a.detail}</span>
-                          <div className="text-secondary" style={{ fontSize: '0.65rem' }}>{formatTime(a.timestamp)}</div>
+                          <span style={{ color: 'var(--tf-ink)', fontWeight: 500 }}>{a.detail}</span>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--tf-text-muted)', marginTop: 2 }}>{formatTime(a.timestamp)}</div>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
               ) : (
-                <div className="px-3 py-2 d-flex flex-column" style={{ minHeight: '100%' }}>
+                <div className="d-flex flex-column" style={{ minHeight: '100%' }}>
                   {comments.length === 0 ? (
-                    <p className="text-secondary small text-center py-3">No comments yet</p>
+                    <p className="text-muted small text-center py-4">No comments yet</p>
                   ) : (
                     comments.map((c, i) => (
-                      <div key={c._id?.toString() || i} className="mb-2">
-                        <div className="d-flex justify-content-between align-items-center">
-                          <span className="fw-semibold" style={{ fontSize: '0.75rem', color: '#a5b4fc' }}>
+                      <div key={c._id?.toString() || i} className="mb-3">
+                        <div className="d-flex justify-content-between align-items-center mb-1">
+                          <span style={{ fontSize: '0.8rem', fontWeight: 650, color: 'var(--tf-ink)' }}>
                             {c.userName || getUserName(c.userId)}
                           </span>
-                          <span className="text-secondary" style={{ fontSize: '0.6rem' }}>{formatTime(c.createdAt)}</span>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--tf-text-muted)' }}>{formatTime(c.createdAt)}</span>
                         </div>
-                        <div className="text-light small mt-1 p-2 rounded" style={{ backgroundColor: 'rgba(255,255,255,0.04)', fontSize: '0.8rem' }}>
+                        <div style={{ backgroundColor: 'var(--tf-canvas-soft)', padding: '10px 14px', borderRadius: 16, fontSize: '0.85rem', color: 'var(--tf-ink)' }}>
                           {c.text}
                         </div>
                       </div>
@@ -200,17 +202,15 @@ export default function TaskDetailDrawer({ show, onHide, taskId, members, socket
 
             {/* Comment input */}
             {tab === 'comments' && (
-              <div className="px-3 py-2 border-top border-secondary">
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--tf-hairline-soft)' }}>
                 <Form onSubmit={handleComment} className="d-flex gap-2">
                   <Form.Control
-                    size="sm"
                     type="text"
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Write a comment…"
-                    className="bg-dark text-light border-secondary"
                   />
-                  <Button variant="primary" size="sm" type="submit" disabled={!commentText.trim()}>
+                  <Button variant="primary" type="submit" disabled={!commentText.trim()}>
                     <Send size={14} />
                   </Button>
                 </Form>

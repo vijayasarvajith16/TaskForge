@@ -31,7 +31,7 @@ export default function Column({
       <div className="tf-column-header">
         <div
           className="tf-column-dot"
-          style={{ background: accent, boxShadow: `0 0 6px ${accent}` }}
+          style={{ background: accent }}
         />
         <span className="tf-column-name">{column.name}</span>
         <span className="tf-column-count">{tasks.length}</span>
